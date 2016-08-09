@@ -9,8 +9,8 @@ import random
 import time
 import threading
 
-host = 'ittun.com' # Ngrok服务器地址
-port = 44433 # 端口
+host = 'server.ngrok.cc' # Ngrok服务器地址
+port = 4443 # 端口
 bufsize = 1024 # 吞吐量
 
 Tunnels = list() # 全局渠道赋值

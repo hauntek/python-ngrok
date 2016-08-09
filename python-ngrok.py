@@ -212,8 +212,8 @@ def HKClient(sock, linkstate, type, tosock = None):
                     lenbyte = tolen1(recvbuf[0:4])
                     if len(recvbuf) >= (8 + lenbyte):
                         buf = recvbuf[8:].decode('utf-8')
+                        print(buf)
                         js = json.loads(buf)
-                        print(js)
                         if type == 1:
                             if js['Type'] == 'ReqProxy':
                                 newsock = connectremote(host, port)

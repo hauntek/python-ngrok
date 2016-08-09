@@ -314,3 +314,5 @@ if __name__ == '__main__':
         if pingtime + 25 < time.time() and pingtime != 0:
             sendpack(mainsocket, Ping())
             pingtime = time.time()
+
+        time.sleep(1)

@@ -283,8 +283,8 @@ def HKClient(sock, linkstate, type, tosock = None):
 
     if type == 1:
         mainsocket = False
-    # if type == 3:
-    #     tosock.close()
+    if type == 3:
+        tosock.close()
     sock.close()
 
 # 客户端程序初始化

@@ -177,6 +177,7 @@ def getRandChar(length):
 
 # 客户端程序处理过程
 def HKClient(sock, linkstate, type, tosock = None):
+    global mainsocket
     global ClientId
     global pingtime
     recvbuf = bytes()
@@ -265,7 +266,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                     recvbuf = bytes()
 
             except socket.error:
-                print('socket.error')
+                # print('socket.error')
                 break
 
         # 可写

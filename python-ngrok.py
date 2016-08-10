@@ -9,7 +9,7 @@ import random
 import time
 import threading
 
-host = 'server.ngrok.cc' # Ngrok服务器地址
+host = 'tunnel.qydev.com' # Ngrok服务器地址
 port = 4443 # 端口
 bufsize = 1024 # 吞吐量
 
@@ -192,6 +192,7 @@ def HKClient(sock, linkstate, type, tosock = None):
             if sock == 1:
                 mainsocket = False
             print('z:close')
+
         try:
             readable , writable , exceptional = select.select(inputs, outputs, [], 1)
         except select.error:
@@ -271,15 +272,20 @@ def HKClient(sock, linkstate, type, tosock = None):
 
         # 可写
         if writable:
-            if linkstate == 0:
-                if type == 1:
-                    sendpack(sock, NgrokAuth(), False)
-                    linkstate = 1
-                if type == 2:
-                    sendpack(sock, RegProxy(ClientId), False)
-                    linkstate = 1
-                if type == 3:
-                    linkstate = 1
+            try:
+                if linkstate == 0:
+                    if type == 1:
+                        sendpack(sock, NgrokAuth(), False)
+                        linkstate = 1
+                    if type == 2:
+                        sendpack(sock, RegProxy(ClientId), False)
+                        linkstate = 1
+                    if type == 3:
+                        linkstate = 1
+
+            except socket.error:
+                # print('socket.error')
+                break
 
     if type == 1:
         mainsocket = False
@@ -289,13 +295,12 @@ def HKClient(sock, linkstate, type, tosock = None):
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    print('python-ngrok v1.2')
+    print('python-ngrok v1.3')
     mainsocket = connectremote(host, port)
     if mainsocket:
         thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
         thread.start()
     while True:
-
         # 检测控制连接是否连接.
         if mainsocket == False:
             ip = dnsopen(host)
@@ -313,7 +318,11 @@ if __name__ == '__main__':
 
         # 发送心跳
         if pingtime + 25 < time.time() and pingtime != 0:
-            sendpack(mainsocket, Ping())
-            pingtime = time.time()
+            try:
+                sendpack(mainsocket, Ping())
+                pingtime = time.time()
+            except socket.error:
+                # print('socket.error')
+                continue
 
         time.sleep(1)

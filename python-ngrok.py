@@ -295,7 +295,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    print('python-ngrok v1.3')
+    print('python-ngrok v1.31')
     mainsocket = connectremote(host, port)
     if mainsocket:
         thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))

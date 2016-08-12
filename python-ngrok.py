@@ -189,7 +189,7 @@ def HKClient(sock, linkstate, type, tosock = None):
             if linkstate == 0:
                 outputs.append(sock)
         else:
-            if sock == 1:
+            if type == 1:
                 mainsocket = False
             print('z:close')
 
@@ -290,12 +290,15 @@ def HKClient(sock, linkstate, type, tosock = None):
     if type == 1:
         mainsocket = False
     if type == 3:
-        tosock.shutdown(socket.SHUT_RDWR)
+        try:
+            tosock.shutdown(socket.SHUT_RDWR)
+        except socket.error:
+            tosock.close()
     sock.close()
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    print('python-ngrok v1.31')
+    print('python-ngrok v1.32')
     mainsocket = connectremote(host, port)
     if mainsocket:
         thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))

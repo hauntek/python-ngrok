@@ -142,13 +142,8 @@ def Ping():
     return(buffer)
 
 def lentobyte(len):
-    xx = struct.pack('N', len)
-    xx1 = struct.pack('N', 0)
-    return xx + xx1
-
-def lentobyte1(len):
-    xx = struct.pack('L', len)
-    xx1 = struct.pack('L', 0)
+    xx = struct.pack('I', len)
+    xx1 = struct.pack('I', 0)
     return xx + xx1
 
 def sendbuf(sock, buf, isblock = True):
@@ -161,15 +156,12 @@ def sendbuf(sock, buf, isblock = True):
 def sendpack(sock, msg, isblock = True):
     if isblock:
         sock.setblocking(1)
-    sock.send(lentobyte1(len(msg)) + msg.encode('utf-8'))
+    sock.send(lentobyte(len(msg)) + msg.encode('utf-8'))
     if isblock:
         sock.setblocking(0)
 
 def tolen(v):
-    return struct.unpack('N', v)[0]
-
-def tolen1(v):
-    return struct.unpack('L', v)[0]
+    return struct.unpack('I', v)[0]
 
 def getRandChar(length):
     _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
@@ -211,7 +203,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                         recvbuf += recvbut
 
                 if type == 1 or (type == 2 and linkstate == 1):
-                    lenbyte = tolen1(recvbuf[0:4])
+                    lenbyte = tolen(recvbuf[0:4])
                     if len(recvbuf) >= (8 + lenbyte):
                         buf = recvbuf[8:].decode('utf-8')
                         print(buf)

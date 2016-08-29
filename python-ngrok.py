@@ -1,5 +1,6 @@
 # 建议Python 3.1 以上运行 以下是依赖
 # 项目地址: https://github.com/hauntek/python-ngrok
+# Version: v1.36
 import socket
 import select
 import ssl
@@ -7,6 +8,7 @@ import json
 import struct
 import random
 import time
+import logging
 import threading
 
 host = 'tunnel.qydev.com' # Ngrok服务器地址
@@ -74,11 +76,13 @@ def dnsopen(host):
 
 def connectremote(host, port):
     try:
-        ip = socket.gethostbyname(host)
+        host = socket.gethostbyname(host)
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_SSLv23)
-        ssl_client.connect((ip, port))
+        ssl_client.connect((host, port))
         ssl_client.setblocking(0)
+        logger = logging.getLogger('%s:%d' % ('Conn', ssl_client.fileno()))
+        logger.debug('New connection to: %s:%d' % (host, port))
     except socket.error:
         return False
 
@@ -86,10 +90,12 @@ def connectremote(host, port):
 
 def connectlocal(localhost, localport):
     try:
-        ip = socket.gethostbyname(localhost)
+        localhost = socket.gethostbyname(localhost)
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((ip, localport))
+        client.connect((localhost, localport))
         client.setblocking(0)
+        logger = logging.getLogger('%s:%d' % ('Conn', client.fileno()))
+        logger.debug('New connection to: %s:%d' % (localhost, localport))
     except socket.error:
         return False
 
@@ -157,6 +163,8 @@ def sendpack(sock, msg, isblock = True):
     if isblock:
         sock.setblocking(1)
     sock.send(lentobyte(len(msg)) + msg.encode('utf-8'))
+    logger = logging.getLogger('%s:%d' % ('Send', sock.fileno()))
+    logger.debug('Writing message: %s' % msg)
     if isblock:
         sock.setblocking(0)
 
@@ -183,12 +191,14 @@ def HKClient(sock, linkstate, type, tosock = None):
         else:
             if type == 1:
                 mainsocket = False
-            print('z:close')
+            logger = logging.getLogger('%s' % 'client')
+            logger.error('z:close')
 
         try:
             readable , writable , exceptional = select.select(inputs, outputs, [], 1)
         except select.error:
-            print('select.error')
+            logger = logging.getLogger('%s' % 'client')
+            logger.error('select.error')
 
         # 可读
         if readable:
@@ -206,7 +216,9 @@ def HKClient(sock, linkstate, type, tosock = None):
                     lenbyte = tolen(recvbuf[0:4])
                     if len(recvbuf) >= (8 + lenbyte):
                         buf = recvbuf[8:].decode('utf-8')
-                        print(buf)
+                        logger = logging.getLogger('%s:%d' % ('Recv', sock.fileno()))
+                        logger.debug('Reading message with length: %d' % len(buf))
+                        logger.debug('Read message: %s' % buf)
                         js = json.loads(buf)
                         if type == 1:
                             if js['Type'] == 'ReqProxy':
@@ -216,6 +228,8 @@ def HKClient(sock, linkstate, type, tosock = None):
                                     thread.start()
                             if js['Type'] == 'AuthResp':
                                 ClientId = js['Payload']['ClientId']
+                                logger = logging.getLogger('%s' % 'client')
+                                logger.info('Authenticated with server, client id: %s' % ClientId)
                                 sendpack(sock, Ping())
                                 pingtime = time.time()
                                 for tunnelinfo in Tunnels:
@@ -223,11 +237,12 @@ def HKClient(sock, linkstate, type, tosock = None):
                                     sendpack(sock, ReqTunnel(tunnelinfo['protocol'], tunnelinfo['hostname'], tunnelinfo['subdomain'], tunnelinfo['rport']))
                             if js['Type'] == 'NewTunnel':
                                 if js['Payload']['Error'] != '':
-                                    print('Add tunnel failed,%s' % js['Payload']['Error'])
+                                    logger = logging.getLogger('%s' % 'client')
+                                    logger.error('Server failed to allocate tunnel: %s' % js['Payload']['Error'])
                                     time.sleep(30)
                                 else:
-                                    print('Add tunnel ok,type:%s url:%s' % (js['Payload']['Protocol'], js['Payload']['Url']))
-
+                                    logger = logging.getLogger('%s' % 'client')
+                                    logger.info('Tunnel established at %s' % js['Payload']['Url'])
                         if type == 2:
                             if linkstate == 1:
                                 if js['Type'] == 'StartProxy':
@@ -240,7 +255,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                         tosock = newsock
                                         linkstate = 2
                                     else:
-                                        body = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Web服务错误</title><meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><style>html,body{height:100%%}body{margin:0;padding:0;width:100%%;display:table;font-weight:100;font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif}.container{text-align:center;display:table-cell;vertical-align:middle}.content{border:1px solid #ebccd1;text-align:center;display:inline-block;background-color:#f2dede;color:#a94442;padding:30px}.title{font-size:18px}.copyright{margin-top:30px;text-align:right;color:#000}</style></head><body><div class="container"><div class="content"><div class="title">隧道 %s 无效<br>无法连接到<strong>%s</strong>. 此端口尚未提供Web服务</div></div></div></body></html>'
+                                        body = '<html><body style="background-color: #97a8b9"><div style="margin:auto; width:400px;padding: 20px 60px; background-color: #D3D3D3; border: 5px solid maroon;"><h2>Tunnel %s unavailable</h2><p>Unable to initiate connection to <strong>%s</strong>. This port is not yet available for web server.</p>'
                                         html = body % (js['Payload']['Url'], loacladdr['lhost'] + ':' + str(loacladdr['lport']))
                                         header = "HTTP/1.0 502 Bad Gateway" + "\r\n"
                                         header += "Content-Type: text/html" + "\r\n"
@@ -259,7 +274,8 @@ def HKClient(sock, linkstate, type, tosock = None):
                     recvbuf = bytes()
 
             except socket.error:
-                # print('socket.error')
+                # logger = logging.getLogger('%s' % 'client')
+                # logger.error('socket.error')
                 break
 
         # 可写
@@ -276,21 +292,23 @@ def HKClient(sock, linkstate, type, tosock = None):
                         linkstate = 1
 
             except socket.error:
-                # print('socket.error')
+                # logger = logging.getLogger('%s' % 'client')
+                # logger.error('socket.error')
                 break
 
     if type == 1:
         mainsocket = False
     if type == 3:
-        try:
-            tosock.shutdown(socket.SHUT_RDWR)
-        except socket.error:
-            tosock.close()
+        if tosock.fileno() != -1:
+            tosock.shutdown(socket.SHUT_WR)
+
+    logger = logging.getLogger('%s:%d' % ('Close', sock.fileno()))
+    logger.debug('Closing')
     sock.close()
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    print('python-ngrok v1.32')
+    logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s:%(lineno)d] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     mainsocket = connectremote(host, port)
     if mainsocket:
         thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
@@ -300,24 +318,25 @@ if __name__ == '__main__':
         if mainsocket == False:
             ip = dnsopen(host)
             if ip == False:
-                print('update dns')
+                logging.info('update dns')
                 time.sleep(10)
                 continue
             mainsocket = connectremote(ip, port)
             if mainsocket == False:
-                print('connect failed...!')
+                logging.info('connect failed...!')
                 time.sleep(10)
                 continue
             thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
             thread.start()
 
         # 发送心跳
-        if pingtime + 25 < time.time() and pingtime != 0:
+        if pingtime + 20 < time.time() and pingtime != 0:
             try:
                 sendpack(mainsocket, Ping())
                 pingtime = time.time()
             except socket.error:
-                # print('socket.error')
+                # logger = logging.getLogger('%s' % 'client')
+                # logger.error('socket.error')
                 continue
 
         time.sleep(1)

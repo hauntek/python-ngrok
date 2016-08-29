@@ -191,6 +191,7 @@ def HKClient(sock, linkstate, type, tosock = None):
         else:
             if type == 1:
                 mainsocket = False
+                pingtime = 0
             logger = logging.getLogger('%s' % 'client')
             logger.error('z:close')
 
@@ -298,6 +299,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 
     if type == 1:
         mainsocket = False
+        pingtime = 0
     if type == 3:
         if tosock.fileno() != -1:
             tosock.shutdown(socket.SHUT_WR)

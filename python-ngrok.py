@@ -1,13 +1,15 @@
 # 建议Python 3.1 以上运行 以下是依赖
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.36
+# Version: v1.38
 import socket
 import select
 import ssl
 import json
 import struct
 import random
+import sys
 import time
+import atexit
 import logging
 import threading
 
@@ -175,6 +177,12 @@ def getRandChar(length):
     _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
     return ''.join(random.sample(_chars, length))
 
+def main_shutdown():
+    global mainsocket
+    if mainsocket == False: return
+    if mainsocket.fileno() == -1: return
+    sendpack(mainsocket, 'close')
+
 # 客户端程序处理过程
 def HKClient(sock, linkstate, type, tosock = None):
     global mainsocket
@@ -226,6 +234,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                 newsock = connectremote(host, port)
                                 if newsock:
                                     thread = threading.Thread(target = HKClient, args = (newsock, 0, 2))
+                                    thread.setDaemon(True)
                                     thread.start()
                             if js['Type'] == 'AuthResp':
                                 ClientId = js['Payload']['ClientId']
@@ -252,6 +261,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                     newsock = connectlocal(loacladdr['lhost'], loacladdr['lport'])
                                     if newsock:
                                         thread = threading.Thread(target = HKClient, args = (newsock, 0, 3, sock))
+                                        thread.setDaemon(True)
                                         thread.start()
                                         tosock = newsock
                                         linkstate = 2
@@ -311,34 +321,39 @@ def HKClient(sock, linkstate, type, tosock = None):
 # 客户端程序初始化
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s:%(lineno)d] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
-    mainsocket = connectremote(host, port)
-    if mainsocket:
-        thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
-        thread.start()
+    # 注册退出回调函数
+    atexit.register(main_shutdown)
     while True:
-        # 检测控制连接是否连接.
-        if mainsocket == False:
-            ip = dnsopen(host)
-            if ip == False:
-                logging.info('update dns')
-                time.sleep(10)
-                continue
-            mainsocket = connectremote(ip, port)
+        try:
+            # 检测控制连接是否连接.
             if mainsocket == False:
-                logging.info('connect failed...!')
-                time.sleep(10)
-                continue
-            thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
-            thread.start()
+                ip = dnsopen(host)
+                if ip == False:
+                    logging.info('update dns')
+                    time.sleep(10)
+                    continue
+                mainsocket = connectremote(ip, port)
+                if mainsocket == False:
+                    logging.info('connect failed...!')
+                    time.sleep(10)
+                    continue
+                thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))
+                thread.setDaemon(True)
+                thread.start()
 
-        # 发送心跳
-        if pingtime + 20 < time.time() and pingtime != 0:
-            try:
-                sendpack(mainsocket, Ping())
-                pingtime = time.time()
-            except socket.error:
-                # logger = logging.getLogger('%s' % 'client')
-                # logger.error('socket.error')
-                continue
+            # 发送心跳
+            if pingtime + 20 < time.time() and pingtime != 0:
+                if mainsocket.fileno() != -1:
+                    sendpack(mainsocket, Ping())
+                    pingtime = time.time()
 
-        time.sleep(1)
+            time.sleep(1)
+
+        # 捕获心跳异常信号
+        except socket.error:
+            # logger = logging.getLogger('%s' % 'client')
+            # logger.error('socket.error')
+            continue
+        # 捕获中断异常信号
+        except KeyboardInterrupt:
+            sys.exit()

@@ -179,8 +179,9 @@ def getRandChar(length):
 
 def main_shutdown():
     global mainsocket
+    global pingtime
     if mainsocket == False: return
-    if mainsocket.fileno() == -1: return
+    if pingtime == False: return
     sendpack(mainsocket, 'close')
 
 # 客户端程序处理过程
@@ -199,7 +200,6 @@ def HKClient(sock, linkstate, type, tosock = None):
         else:
             if type == 1:
                 mainsocket = False
-                pingtime = 0
             logger = logging.getLogger('%s' % 'client')
             logger.error('z:close')
 
@@ -309,7 +309,6 @@ def HKClient(sock, linkstate, type, tosock = None):
 
     if type == 1:
         mainsocket = False
-        pingtime = 0
     if type == 3:
         if tosock.fileno() != -1:
             tosock.shutdown(socket.SHUT_WR)
@@ -343,17 +342,14 @@ if __name__ == '__main__':
 
             # 发送心跳
             if pingtime + 20 < time.time() and pingtime != 0:
-                if mainsocket.fileno() != -1:
-                    sendpack(mainsocket, Ping())
-                    pingtime = time.time()
+                sendpack(mainsocket, Ping())
+                pingtime = time.time()
 
             time.sleep(1)
 
         # 捕获心跳异常信号
         except socket.error:
-            # logger = logging.getLogger('%s' % 'client')
-            # logger.error('socket.error')
-            continue
+            pingtime = 0
         # 捕获中断异常信号
         except KeyboardInterrupt:
             sys.exit()

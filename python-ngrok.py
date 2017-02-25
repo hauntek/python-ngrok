@@ -1,4 +1,5 @@
-# 建议Python 3.1 以上运行 以下是依赖
+# -*- coding: UTF-8 -*-
+# 建议Python 2.7.13 以上运行 以下是依赖
 # 项目地址: https://github.com/hauntek/python-ngrok
 # Version: v1.38
 import socket

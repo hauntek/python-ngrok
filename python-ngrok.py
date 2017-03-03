@@ -311,3 +311,5 @@ if __name__ == '__main__':
 
         except socket.error:
             pingtime = 0
+        except KeyboardInterrupt:
+            sys.exit()

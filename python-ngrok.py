@@ -184,18 +184,17 @@ def HKClient(sock, linkstate, type, tosock = None):
     global pingtime
     recvbuf = bytes()
     while True:
-
-        if linkstate == 0:
-            if type == 1:
-                sendpack(sock, NgrokAuth(), False)
-                linkstate = 1
-            if type == 2:
-                sendpack(sock, RegProxy(ClientId), False)
-                linkstate = 1
-            if type == 3:
-                linkstate = 1
-
         try:
+            if linkstate == 0:
+                if type == 1:
+                    sendpack(sock, NgrokAuth(), False)
+                    linkstate = 1
+                if type == 2:
+                    sendpack(sock, RegProxy(ClientId), False)
+                    linkstate = 1
+                if type == 3:
+                    linkstate = 1
+
             recvbut = sock.recv(bufsize)
             if not recvbut: break
 

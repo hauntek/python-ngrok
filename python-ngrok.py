@@ -207,7 +207,7 @@ def HKClient(sock, linkstate, type, tosock = None):
             if type == 1 or (type == 2 and linkstate == 1):
                 lenbyte = tolen(recvbuf[0:4])
                 if len(recvbuf) >= (8 + lenbyte):
-                    buf = recvbuf[8:].decode('utf-8')
+                    buf = recvbuf[8:lenbyte + 8].decode('utf-8')
                     logger = logging.getLogger('%s:%d' % ('Recv', sock.fileno()))
                     logger.debug('Reading message with length: %d' % len(buf))
                     logger.debug('Read message: %s' % buf)

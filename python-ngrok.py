@@ -255,7 +255,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                     header += "Content-Type: text/html" + "\r\n"
                                     header += "Content-Length: %d" + "\r\n"
                                     header += "\r\n" + "%s"
-                                    buf = header % (len(html), html)
+                                    buf = header % (len(html.encode('utf-8')), html)
                                     sendbuf(sock, buf.encode('utf-8'))
 
                     if len(recvbuf) == (8 + lenbyte):

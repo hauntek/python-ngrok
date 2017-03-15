@@ -171,7 +171,7 @@ def sendpack(sock, msg, isblock = False):
 def tolen(v):
     if len(v) == 8:
         return struct.unpack('<II', v)[0]
-    return 65535
+    return 0
 
 def getRandChar(length):
     _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"

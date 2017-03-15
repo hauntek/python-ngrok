@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# 建议Python 2.7.13 或 Python 3.1 以上运行
+# 建议Python 2.7.12 或 Python 3.1 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.41
+# Version: v1.42
 import socket
 import ssl
 import json
@@ -150,9 +150,7 @@ def Ping():
     return(buffer)
 
 def lentobyte(len):
-    xx = struct.pack('I', len)
-    xx1 = struct.pack('I', 0)
-    return xx + xx1
+    return struct.pack('<LL', len, 0)
 
 def sendbuf(sock, buf, isblock = False):
     if isblock:
@@ -171,7 +169,9 @@ def sendpack(sock, msg, isblock = False):
         sock.setblocking(0)
 
 def tolen(v):
-    return struct.unpack('I', v)[0]
+    if len(v) == 8:
+        return struct.unpack('<II', v)[0]
+    return 65535
 
 def getRandChar(length):
     _chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"
@@ -205,7 +205,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                     recvbuf += recvbut
 
             if type == 1 or (type == 2 and linkstate == 1):
-                lenbyte = tolen(recvbuf[0:4])
+                lenbyte = tolen(recvbuf[0:8])
                 if len(recvbuf) >= (8 + lenbyte):
                     buf = recvbuf[8:lenbyte + 8].decode('utf-8')
                     logger = logging.getLogger('%s:%d' % ('Recv', sock.fileno()))
@@ -237,26 +237,25 @@ def HKClient(sock, linkstate, type, tosock = None):
                                 logger = logging.getLogger('%s' % 'client')
                                 logger.info('Tunnel established at %s' % js['Payload']['Url'])
                     if type == 2:
-                        if linkstate == 1:
-                            if js['Type'] == 'StartProxy':
-                                loacladdr = getloacladdr(Tunnels, js['Payload']['Url'])
+                        if js['Type'] == 'StartProxy':
+                            loacladdr = getloacladdr(Tunnels, js['Payload']['Url'])
 
-                                newsock = connectlocal(loacladdr['lhost'], loacladdr['lport'])
-                                if newsock:
-                                    thread = threading.Thread(target = HKClient, args = (newsock, 0, 3, sock))
-                                    thread.setDaemon(True)
-                                    thread.start()
-                                    tosock = newsock
-                                    linkstate = 2
-                                else:
-                                    body = '<html><body style="background-color: #97a8b9"><div style="margin:auto; width:400px;padding: 20px 60px; background-color: #D3D3D3; border: 5px solid maroon;"><h2>Tunnel %s unavailable</h2><p>Unable to initiate connection to <strong>%s</strong>. This port is not yet available for web server.</p>'
-                                    html = body % (js['Payload']['Url'], loacladdr['lhost'] + ':' + str(loacladdr['lport']))
-                                    header = "HTTP/1.0 502 Bad Gateway" + "\r\n"
-                                    header += "Content-Type: text/html" + "\r\n"
-                                    header += "Content-Length: %d" + "\r\n"
-                                    header += "\r\n" + "%s"
-                                    buf = header % (len(html.encode('utf-8')), html)
-                                    sendbuf(sock, buf.encode('utf-8'))
+                            newsock = connectlocal(loacladdr['lhost'], loacladdr['lport'])
+                            if newsock:
+                                thread = threading.Thread(target = HKClient, args = (newsock, 0, 3, sock))
+                                thread.setDaemon(True)
+                                thread.start()
+                                tosock = newsock
+                                linkstate = 2
+                            else:
+                                body = '<html><body style="background-color: #97a8b9"><div style="margin:auto; width:400px;padding: 20px 60px; background-color: #D3D3D3; border: 5px solid maroon;"><h2>Tunnel %s unavailable</h2><p>Unable to initiate connection to <strong>%s</strong>. This port is not yet available for web server.</p>'
+                                html = body % (js['Payload']['Url'], loacladdr['lhost'] + ':' + str(loacladdr['lport']))
+                                header = "HTTP/1.0 502 Bad Gateway" + "\r\n"
+                                header += "Content-Type: text/html" + "\r\n"
+                                header += "Content-Length: %d" + "\r\n"
+                                header += "\r\n" + "%s"
+                                buf = header % (len(html.encode('utf-8')), html)
+                                sendbuf(sock, buf.encode('utf-8'))
 
                     if len(recvbuf) == (8 + lenbyte):
                         recvbuf = bytes()

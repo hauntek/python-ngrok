@@ -282,18 +282,22 @@ def HKClient(sock, linkstate, type, tosock = None):
 # 客户端程序初始化
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+    logger = logging.getLogger('%s' % 'client')
+    logger.info('python-ngrok v1.42')
     while True:
         try:
             # 检测控制连接是否连接.
             if mainsocket == False:
                 ip = dnsopen(host)
                 if ip == False:
-                    logging.info('update dns')
+                    logger = logging.getLogger('%s' % 'client')
+                    logger.info('update dns')
                     time.sleep(10)
                     continue
                 mainsocket = connectremote(ip, port)
                 if mainsocket == False:
-                    logging.info('connect failed...!')
+                    logger = logging.getLogger('%s' % 'client')
+                    logger.info('connect failed...!')
                     time.sleep(10)
                     continue
                 thread = threading.Thread(target = HKClient, args = (mainsocket, 0, 1))

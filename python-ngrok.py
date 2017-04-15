@@ -281,7 +281,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s:%(lineno)d] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+    logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     while True:
         try:
             # 检测控制连接是否连接.

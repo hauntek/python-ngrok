@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 2.7.12 或 Python 3.1 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.42
+# Version: v1.46
 import socket
 import ssl
 import json
@@ -12,13 +12,64 @@ import sys
 import time
 import logging
 import threading
-import json
 
-global host  # Ngrok服务器地址
-global port  # 端口
-global bufsize  # 吞吐量
-global Tunnels  # 全局渠道赋值
+host = 'tunnel.qydev.com' # Ngrok服务器地址
+port = 4443 # 端口
+bufsize = 1024 # 吞吐量
 
+Tunnels = list() # 全局渠道赋值
+body = dict()
+body['protocol'] = 'http'
+body['hostname'] = 'www.xxx.com'
+body['subdomain'] = ''
+body['rport'] = 0
+body['lhost'] = '127.0.0.1'
+body['lport'] = 80
+Tunnels.append(body) # 加入渠道队列
+
+body = dict()
+body['protocol'] = 'http'
+body['hostname'] = ''
+body['subdomain'] = 'xxx'
+body['rport'] = 0
+body['lhost'] = '127.0.0.1'
+body['lport'] = 80
+Tunnels.append(body) # 加入渠道队列
+
+body = dict()
+body['protocol'] = 'tcp'
+body['hostname'] = ''
+body['subdomain'] = ''
+body['rport'] = 55499
+body['lhost'] = '127.0.0.1'
+body['lport'] = 22
+Tunnels.append(body) # 加入渠道队列
+
+# 读取配置文件
+if len(sys.argv) >= 2:
+    file_object = open(sys.argv[1])
+    try:
+        all_the_text = file_object.read()
+        config_object = json.loads(all_the_text)
+        host = config_object["server"]["host"] # Ngrok服务器地址
+        port = int(config_object["server"]["port"]) # 端口
+        bufsize = int(config_object["server"]["bufsize"]) # 吞吐量
+        Tunnels = list() # 重置渠道赋值
+        for Tunnel in config_object["client"]:
+            body = dict()
+            body['protocol'] = Tunnel["protocol"]
+            body['hostname'] = Tunnel["hostname"]
+            body['subdomain'] = Tunnel["subdomain"]
+            body['rport'] = int(Tunnel["rport"])
+            body['lhost'] = Tunnel["lhost"]
+            body['lport'] = int(Tunnel["lport"])
+            Tunnels.append(body) # 加入渠道队列
+        del all_the_text
+        del config_object
+    except Exception:
+        pass
+    finally:
+        file_object.close()
 
 mainsocket = 0
 
@@ -256,41 +307,9 @@ def HKClient(sock, linkstate, type, tosock = None):
 
 # 客户端程序初始化
 if __name__ == '__main__':
-    global host
-    global port
-    global bufsize
-    global Tunnels
-    Tunnels = list()
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger('%s' % 'client')
-    logger.info('python-ngrok v1.42')
-    # 读取配置文件
-    if len(sys.argv) <= 1:
-        logger.error("No configuration file. Please pass it in the parameters.")
-        exit(1)
-    file_object = open(sys.argv[1])
-    try:
-        all_the_text = file_object.read()
-
-        config_object = json.loads(all_the_text)
-
-        host = config_object["server"]["host"]     # Ngrok服务器地址
-        port = int(config_object["server"]["port"])     # 端口
-        bufsize = int(config_object["server"]["bufsize"])  # 吞吐量
-        for client in range(0,len(config_object["client"])):
-            body = dict()
-            body['protocol'] = config_object["client"][client]["protocol"]
-            body['hostname'] = config_object["client"][client]["hostname"]
-            body['subdomain'] = config_object["client"][client]["subdomain"]
-            body['rport'] = int(config_object["client"][client]["rport"])
-            body['lhost'] = config_object["client"][client]["lhost"]
-            body['lport'] = int(config_object["client"][client]["lport"])
-            Tunnels.append(body)  # 加入渠道队列
-    except:
-        logger.error("The configuration file read failed")
-        exit(1)
-    finally:
-        file_object.close()
+    logger.info('python-ngrok v1.46')
     while True:
         try:
             # 检测控制连接是否连接.

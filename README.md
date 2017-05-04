@@ -17,7 +17,7 @@ Python 2.7.12 或 Python 3.1 以上
 ***
 
 1.支持配置文件运行,优先读取配置信息
-- 运行命令: ./python-ngrok.py ngrok.config
+- 运行命令: `./python-ngrok.py ngrok.config`
 
 2.感谢lightclaves 贡献配置文件代码
 

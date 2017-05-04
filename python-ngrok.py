@@ -67,6 +67,9 @@ if len(sys.argv) >= 2:
         del all_the_text
         del config_object
     except Exception:
+        # logger = logging.getLogger('%s' % 'config')
+        # logger.error('The configuration file read failed')
+        # exit(1)
         pass
     finally:
         file_object.close()

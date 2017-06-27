@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# 建议Python 2.7.12 或 Python 3.1 以上运行
+# 建议Python 2.7.9 或 Python 3.1 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
 # Version: v1.46
 import socket

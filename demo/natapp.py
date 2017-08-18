@@ -86,7 +86,7 @@ def natapp_auth(options):
     buf = header % (len(query), query)
     ssl_client.sendall(buf.encode('utf-8')) # 发送请求头
 
-    fd = ssl_client.makefile('rb', 0, encoding='utf-8')
+    fd = ssl_client.makefile('rb', 0)
     body = bytes()
     while True:
         line = fd.readline().decode('utf-8')

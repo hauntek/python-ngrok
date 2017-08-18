@@ -44,7 +44,7 @@ if len(opts) == 0:
     print(
         '使用说明\n' \
         '在命令行模式运行 python natapp.py --authtoken=xxxxxxxxxxxxxxxx\n' \
-        '如果是复合隧道换成 python ngrok.py --clienttoken=xxxxxxxxxxxxxxxx\n' \
+        '如果是复合隧道换成 python natapp.py --clienttoken=xxxxxxxxxxxxxxxx\n' \
         '请登录 https://natapp.cn 获取 authtoken\n' \
     )
     time.sleep(10)

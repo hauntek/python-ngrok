@@ -1,5 +1,5 @@
 # python-ngrok
-基于python-ngrok v1.42 适配ngrokcc Python 客户端 (待定)
+基于python-ngrok v1.42 适配ngrok.cc Python 客户端 (待定)
 
 基于python-ngrok v1.42 适配natapp.cn Python 客户端 (2017/08/18)
 

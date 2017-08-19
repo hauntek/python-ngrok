@@ -93,7 +93,7 @@ def ngrok_adds(Tunnel):
             body['subdomain'] = tunnelinfo['subdomain']
             body['httpauth'] = tunnelinfo['httpauth']
             body['rport'] = tunnelinfo['remoteport']
-            body['lhost'] = proto[0]
+            body['lhost'] = str(proto[0])
             body['lport'] = int(proto[1])
             Tunnels.append(body) # 加入渠道队列
 

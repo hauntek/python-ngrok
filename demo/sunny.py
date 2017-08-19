@@ -23,7 +23,6 @@ import logging
 import threading
 
 python_version = sys.version_info >= (3, 0)
-
 if not python_version:
     reload(sys)
     sys.setdefaultencoding('utf8')

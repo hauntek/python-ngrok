@@ -317,8 +317,10 @@ def HKClient(sock, linkstate, type, tosock = None):
     if type == 1:
         mainsocket = False
     if type == 3:
-        if tosock.fileno() != -1:
+        try:
             tosock.shutdown(socket.SHUT_WR)
+        except socket.error:
+            tosock.close()
 
     logger = logging.getLogger('%s:%d' % ('Close', sock.fileno()))
     logger.debug('Closing')

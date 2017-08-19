@@ -22,6 +22,12 @@ import time
 import logging
 import threading
 
+python_version = sys.version_info >= (3, 0)
+
+if not python_version:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
+
 options = {
     'clientid':'',
 }
@@ -45,14 +51,22 @@ if len(opts) == 0:
         '如果是多个隧道换成 python sunny.py --clientid=xxxxxxxx,xxxxxxxx\n' \
         '请登录 https://ngrok.cc 获取 clientid\n' \
     )
-    time.sleep(10)
-    sys.exit()
 
 for option, value in opts:
     if option in ['-h', '--help']:
         usage()
     if  option in ['-c', '--clientid']:
         options['clientid'] = value
+
+if options['clientid'] == '':
+    if not python_version:
+        input_clientid = raw_input('请输入clientid：')
+    else:
+        input_clientid = str(input('请输入clientid：'))
+    if input_clientid != '':
+        options['clientid'] = input_clientid
+    else:
+        sys.exit()
 
 Tunnels = list() # 全局渠道赋值
 

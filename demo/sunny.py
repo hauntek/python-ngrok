@@ -54,7 +54,7 @@ if len(opts) == 0:
 for option, value in opts:
     if option in ['-h', '--help']:
         usage()
-    if  option in ['-c', '--clientid']:
+    if option in ['-c', '--clientid']:
         options['clientid'] = value
 
 if options['clientid'] == '':

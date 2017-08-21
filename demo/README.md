@@ -4,7 +4,7 @@
 基于python-ngrok v1.42 适配natapp.cn Python 客户端 (2017/08/18)
 
 # 运行环境
-Python 2.7.12 或 Python 3.1 以上
+Python 2.7.9 或 Python 3.4.2 以上
 
 # 运行方法
 Linux 系统一般自带Python 可以直接运行

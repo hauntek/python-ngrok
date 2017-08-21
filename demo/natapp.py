@@ -58,10 +58,10 @@ if len(opts) == 0:
 for option, value in opts:
     if option in ['-h', '--help']:
         usage()
-    if  option in ['-a', '--authtoken']:
-        options['authtoken'] = value
-    elif  option in ['-c', '--clienttoken']:
+    if option in ['-c', '--clienttoken']:
         options['clienttoken'] = value
+    elif option in ['-a', '--authtoken']:
+        options['authtoken'] = value
 
 # natapp.cn 获取服务器设置
 def natapp_auth(options):

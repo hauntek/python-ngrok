@@ -22,6 +22,11 @@ import time
 import logging
 import threading
 
+python_version = sys.version_info >= (3, 0)
+if not python_version:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
+
 options = {
     'clienttoken':'',
     'authtoken':'',
@@ -53,10 +58,10 @@ if len(opts) == 0:
 for option, value in opts:
     if option in ['-h', '--help']:
         usage()
-    if  option in ['-c', '--clienttoken']:
-        options['clienttoken'] = value
-    elif  option in ['-a', '--authtoken']:
+    if  option in ['-a', '--authtoken']:
         options['authtoken'] = value
+    elif  option in ['-c', '--clienttoken']:
+        options['clienttoken'] = value
 
 # natapp.cn 获取服务器设置
 def natapp_auth(options):

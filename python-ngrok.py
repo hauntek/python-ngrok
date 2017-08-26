@@ -87,10 +87,11 @@ def getloacladdr(Tunnels, Url):
 
     for tunnelinfo in Tunnels:
         if tunnelinfo.get('protocol') == protocol:
-            if tunnelinfo.get('hostname') == hostname:
-                return tunnelinfo
-            if tunnelinfo.get('subdomain') == subdomain:
-                return tunnelinfo
+            if tunnelinfo.get('protocol') in ['http', 'https']:
+                if tunnelinfo.get('hostname') == hostname:
+                    return tunnelinfo
+                if tunnelinfo.get('subdomain') == subdomain:
+                    return tunnelinfo
         if tunnelinfo.get('protocol') == 'tcp':
             if tunnelinfo.get('rport') == int(rport):
                 return tunnelinfo

@@ -92,9 +92,9 @@ def getloacladdr(Tunnels, Url):
                     return tunnelinfo
                 if tunnelinfo.get('subdomain') == subdomain:
                     return tunnelinfo
-        if tunnelinfo.get('protocol') == 'tcp':
-            if tunnelinfo.get('rport') == int(rport):
-                return tunnelinfo
+            if tunnelinfo.get('protocol') == 'tcp':
+                if tunnelinfo.get('rport') == int(rport):
+                    return tunnelinfo
 
     return dict()
 

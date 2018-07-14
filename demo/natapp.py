@@ -96,21 +96,23 @@ def natapp_auth(options):
     while True:
         line = fd.readline().decode('utf-8')
         if line == "\n" or line == "\r\n":
-            chunk_size = int(fd.readline(), 16)
-            if chunk_size > 0:
-                body = fd.read(chunk_size).decode('utf-8')
-                break
+            # chunk_size = int(fd.readline(), 16)
+            # if chunk_size > 0:
+                # body = fd.read(chunk_size).decode('utf-8')
+            body = fd.readline().decode('utf-8')
+                # break
+            break
 
     ssl_client.close()
 
     authData = json.loads(body)
-    if authData['success'] == False:
+    if authData['Success'] == False:
         print('认证错误:%s, ErrorCode:%s' % (authData['msg'], authData['errorCode']))
         time.sleep(10)
         sys.exit()
 
     print('认证成功,正在连接服务器...')
-    proto = authData['data']['ServerAddr'].split(':')
+    proto = authData['Data']['ServerAddr'].split(':')
     return proto
 
 print('欢迎使用内网穿透 python-natapp v1.42\r\nCtrl+C 退出')

@@ -99,15 +99,15 @@ def natapp_auth(options):
             # chunk_size = int(fd.readline(), 16)
             # if chunk_size > 0:
                 # body = fd.read(chunk_size).decode('utf-8')
-            body = fd.readline().decode('utf-8')
                 # break
+            body = fd.readline().decode('utf-8')
             break
 
     ssl_client.close()
 
     authData = json.loads(body)
     if authData['Success'] == False:
-        print('认证错误:%s, ErrorCode:%s' % (authData['msg'], authData['errorCode']))
+        print('认证错误:%s, ErrorCode:%s' % (authData['Msg'], authData['ErrorCode']))
         time.sleep(10)
         sys.exit()
 

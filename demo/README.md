@@ -1,5 +1,5 @@
 # python-ngrok
-基于python-ngrok v1.42 适配ngrok.cc / natapp.cn Python 客户端 (2017/08/18)
+基于python-ngrok v1.42 适配 `ngrok.cc` / `natapp.cn` Python 客户端
 
 # 运行环境
 Python 2.7.9 或 Python 3.4.2 以上

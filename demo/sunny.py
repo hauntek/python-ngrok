@@ -69,6 +69,9 @@ if options['clientid'] == '':
 
 Tunnels = list() # 全局渠道赋值
 
+reqIdaddr = dict()
+localaddr = dict()
+
 # ngrok.cc 添加到渠道队列
 def ngrok_adds(Tunnel):
     global Tunnels
@@ -221,9 +224,9 @@ def NgrokAuth():
     buffer = json.dumps(body)
     return(buffer)
 
-def ReqTunnel(Protocol, Hostname, Subdomain, HttpAuth, RemotePort):
+def ReqTunnel(ReqId, Protocol, Hostname, Subdomain, HttpAuth, RemotePort):
     Payload = dict()
-    Payload['ReqId'] = getRandChar(8)
+    Payload['ReqId'] = ReqId
     Payload['Protocol'] = Protocol
     Payload['Hostname'] = Hostname
     Payload['Subdomain'] = Subdomain
@@ -285,6 +288,8 @@ def HKClient(sock, linkstate, type, tosock = None):
     global mainsocket
     global ClientId
     global pingtime
+    global reqIdaddr
+    global localaddr
     recvbuf = bytes()
     while True:
         try:
@@ -328,9 +333,10 @@ def HKClient(sock, linkstate, type, tosock = None):
                             logger.debug('Authenticated with server, client id: %s' % ClientId)
                             sendpack(sock, Ping())
                             pingtime = time.time()
-                            for tunnelinfo in Tunnels:
-                                # 注册通道
-                                sendpack(sock, ReqTunnel(tunnelinfo['protocol'], tunnelinfo['hostname'], tunnelinfo['subdomain'], tunnelinfo['httpauth'], tunnelinfo['rport']))
+                            for info in Tunnels:
+                                reqid = getRandChar(8)
+                                sendpack(sock, ReqTunnel(reqid, info['protocol'], info['hostname'], info['subdomain'], info['httpauth'], info['rport']))
+                                reqIdaddr[reqid] = (info['lhost'], info['lport'])
                         if js['Type'] == 'NewTunnel':
                             if js['Payload']['Error'] != '':
                                 logger = logging.getLogger('%s' % 'client')
@@ -341,11 +347,12 @@ def HKClient(sock, linkstate, type, tosock = None):
                                 logger = logging.getLogger('%s' % 'client')
                                 logger.debug('Tunnel established at %s' % js['Payload']['Url'])
                                 print('隧道建立成功: %s' % js['Payload']['Url']) # 注册成功
+                                localaddr[js['Payload']['Url']] = reqIdaddr[js['Payload']['ReqId']]
                     if type == 2:
                         if js['Type'] == 'StartProxy':
-                            loacladdr = getloacladdr(Tunnels, js['Payload']['Url'])
+                            localhost, localport = localaddr[js['Payload']['Url']]
 
-                            newsock = connectlocal(loacladdr['lhost'], loacladdr['lport'])
+                            newsock = connectlocal(localhost, localport)
                             if newsock:
                                 thread = threading.Thread(target = HKClient, args = (newsock, 0, 3, sock))
                                 thread.setDaemon(True)
@@ -354,7 +361,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                 linkstate = 2
                             else:
                                 body = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Web服务错误</title><meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><style>html,body{height:100%%}body{margin:0;padding:0;width:100%%;display:table;font-weight:100;font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif}.container{text-align:center;display:table-cell;vertical-align:middle}.content{border:1px solid #ebccd1;text-align:center;display:inline-block;background-color:#f2dede;color:#a94442;padding:30px}.title{font-size:18px}.copyright{margin-top:30px;text-align:right;color:#000}</style></head><body><div class="container"><div class="content"><div class="title">隧道 %s 无效<br>无法连接到<strong>%s</strong>. 此端口尚未提供Web服务</div></div></div></body></html>'
-                                html = body % (js['Payload']['Url'], loacladdr['lhost'] + ':' + str(loacladdr['lport']))
+                                html = body % (js['Payload']['Url'], localhost + ':' + str(localport))
                                 header = "HTTP/1.0 502 Bad Gateway" + "\r\n"
                                 header += "Content-Type: text/html" + "\r\n"
                                 header += "Content-Length: %d" + "\r\n"

@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 2.7.9 或 Python 3.4.2 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.46
+# Version: v1.5
 import socket
 import ssl
 import json
@@ -44,6 +44,9 @@ body['rport'] = 55499
 body['lhost'] = '127.0.0.1'
 body['lport'] = 22
 Tunnels.append(body) # 加入渠道队列
+
+reqIdaddr = dict()
+localaddr = dict()
 
 # 读取配置文件
 if len(sys.argv) >= 2:
@@ -148,9 +151,9 @@ def NgrokAuth():
     buffer = json.dumps(body)
     return(buffer)
 
-def ReqTunnel(Protocol, Hostname, Subdomain, RemotePort):
+def ReqTunnel(ReqId, Protocol, Hostname, Subdomain, RemotePort):
     Payload = dict()
-    Payload['ReqId'] = getRandChar(8)
+    Payload['ReqId'] = ReqId
     Payload['Protocol'] = Protocol
     Payload['Hostname'] = Hostname
     Payload['Subdomain'] = Subdomain
@@ -212,6 +215,8 @@ def HKClient(sock, linkstate, type, tosock = None):
     global mainsocket
     global ClientId
     global pingtime
+    global reqIdaddr
+    global localaddr
     recvbuf = bytes()
     while True:
         try:
@@ -255,9 +260,10 @@ def HKClient(sock, linkstate, type, tosock = None):
                             logger.info('Authenticated with server, client id: %s' % ClientId)
                             sendpack(sock, Ping())
                             pingtime = time.time()
-                            for tunnelinfo in Tunnels:
-                                # 注册通道
-                                sendpack(sock, ReqTunnel(tunnelinfo['protocol'], tunnelinfo['hostname'], tunnelinfo['subdomain'], tunnelinfo['rport']))
+                            for info in Tunnels:
+                                reqid = getRandChar(8)
+                                sendpack(sock, ReqTunnel(reqid, info['protocol'], info['hostname'], info['subdomain'], info['rport']))
+                                reqIdaddr[reqid] = (info['lhost'], info['lport'])
                         if js['Type'] == 'NewTunnel':
                             if js['Payload']['Error'] != '':
                                 logger = logging.getLogger('%s' % 'client')
@@ -266,11 +272,12 @@ def HKClient(sock, linkstate, type, tosock = None):
                             else:
                                 logger = logging.getLogger('%s' % 'client')
                                 logger.info('Tunnel established at %s' % js['Payload']['Url'])
+                                localaddr[js['Payload']['Url']] = reqIdaddr[js['Payload']['ReqId']]
                     if type == 2:
                         if js['Type'] == 'StartProxy':
-                            loacladdr = getloacladdr(Tunnels, js['Payload']['Url'])
+                            localhost, localport = localaddr[js['Payload']['Url']]
 
-                            newsock = connectlocal(loacladdr['lhost'], loacladdr['lport'])
+                            newsock = connectlocal(localhost, localport)
                             if newsock:
                                 thread = threading.Thread(target = HKClient, args = (newsock, 0, 3, sock))
                                 thread.setDaemon(True)
@@ -279,7 +286,7 @@ def HKClient(sock, linkstate, type, tosock = None):
                                 linkstate = 2
                             else:
                                 body = '<html><body style="background-color: #97a8b9"><div style="margin:auto; width:400px;padding: 20px 60px; background-color: #D3D3D3; border: 5px solid maroon;"><h2>Tunnel %s unavailable</h2><p>Unable to initiate connection to <strong>%s</strong>. This port is not yet available for web server.</p>'
-                                html = body % (js['Payload']['Url'], loacladdr['lhost'] + ':' + str(loacladdr['lport']))
+                                html = body % (js['Payload']['Url'], localhost + ':' + str(localport))
                                 header = "HTTP/1.0 502 Bad Gateway" + "\r\n"
                                 header += "Content-Type: text/html" + "\r\n"
                                 header += "Content-Length: %d" + "\r\n"
@@ -315,7 +322,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger('%s' % 'client')
-    logger.info('python-ngrok v1.46')
+    logger.info('python-ngrok v1.5')
     while True:
         try:
             # 检测控制连接是否连接.

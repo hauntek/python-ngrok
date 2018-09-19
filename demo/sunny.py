@@ -397,7 +397,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger('%s' % 'client')
-    logger.debug('python-ngrok v1.42')
+    logger.debug('python-ngrok v1.5')
     while True:
         try:
             # 检测控制连接是否连接.

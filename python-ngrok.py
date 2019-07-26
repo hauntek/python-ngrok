@@ -17,7 +17,7 @@ host = 'tunnel.qydev.com' # Ngrok服务器地址
 port = 4443 # 端口
 bufsize = 1024 # 吞吐量
 
-dualstack = 'ipv4/ipv6' # 服务器协议 [ipv4/ipv6=双栈]
+dualstack = 'ipv4/ipv6' # 服务连接协议 [ipv4/ipv6=双栈]
 dualstack_or = 0 # 本地转发协议 [0=双栈, 1=ipv4, 2=ipv6]
 
 Tunnels = list() # 全局渠道赋值

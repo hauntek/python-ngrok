@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 2.7.9 或 Python 3.4.2 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.5
+# Version: v1.52
 import socket
 import ssl
 import json
@@ -16,6 +16,9 @@ import threading
 host = 'tunnel.qydev.com' # Ngrok服务器地址
 port = 4443 # 端口
 bufsize = 1024 # 吞吐量
+
+dualstack = 'ipv4/ipv6' # 服务器协议 [ipv4/ipv6=双栈]
+dualstack_or = 0 # 本地转发协议 [0=双栈, 1=ipv4, 2=ipv6]
 
 Tunnels = list() # 全局渠道赋值
 body = dict()
@@ -82,59 +85,107 @@ mainsocket = 0
 ClientId = ''
 pingtime = 0
 
-def getloacladdr(Tunnels, Url):
-    protocol = Url[0:Url.find(':')]
-    hostname = Url[Url.find('//') + 2:]
-    subdomain = hostname[0:hostname.find('.')]
-    rport = Url[Url.rfind(':') + 1:]
-
-    for tunnelinfo in Tunnels:
-        if tunnelinfo.get('protocol') == protocol:
-            if tunnelinfo.get('protocol') in ['http', 'https']:
-                if tunnelinfo.get('hostname') == hostname:
-                    return tunnelinfo
-                if tunnelinfo.get('subdomain') == subdomain:
-                    return tunnelinfo
-            if tunnelinfo.get('protocol') == 'tcp':
-                if tunnelinfo.get('rport') == int(rport):
-                    return tunnelinfo
-
-    return dict()
-
-def dnsopen(host):
-    try:
-        ip = socket.gethostbyname(host)
-    except socket.error:
-        return False
-
-    return ip
-
 def connectremote(host, port):
-    try:
-        host = socket.gethostbyname(host)
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_SSLv23)
-        ssl_client.connect((host, port))
-        ssl_client.setblocking(1)
-        logger = logging.getLogger('%s:%d' % ('Conn', ssl_client.fileno()))
-        logger.debug('New connection to: %s:%d' % (host, port))
-    except socket.error:
-        return False
+    ipv4_addr = list()
+    ipv6_addr = list()
 
-    return ssl_client
+    for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+        af, socktype, proto, canonname, sa = res
+
+        if dualstack == 'ipv4' or dualstack == 'ipv4/ipv6':
+            if af == socket.AF_INET: ipv4_addr.append(res)
+        if dualstack == 'ipv6' or dualstack == 'ipv4/ipv6':
+            if af == socket.AF_INET6: ipv6_addr.append(res)
+
+    if dualstack == 'ipv6' or dualstack == 'ipv4/ipv6':
+        if len(ipv6_addr) > 0:
+            for res in ipv6_addr:
+                af, socktype, proto, canonname, sa = res
+                try:
+                    client = socket.socket(af, socktype, proto)
+                    ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_SSLv23)
+                except socket.error:
+                    continue
+                try:
+                    ssl_client.connect(sa)
+                    ssl_client.setblocking(1)
+                    logger = logging.getLogger('%s:%d' % ('Conn', ssl_client.fileno()))
+                    logger.debug('New connection to: %s:%d' % (host, port))
+
+                    return ssl_client
+                except socket.error:
+                    continue
+
+    if dualstack == 'ipv4' or dualstack == 'ipv4/ipv6':
+        if len(ipv4_addr) > 0:
+            for res in ipv4_addr:
+                af, socktype, proto, canonname, sa = res
+                try:
+                    client = socket.socket(af, socktype, proto)
+                    ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_SSLv23)
+                except socket.error:
+                    continue
+                try:
+                    ssl_client.connect(sa)
+                    ssl_client.setblocking(1)
+                    logger = logging.getLogger('%s:%d' % ('Conn', ssl_client.fileno()))
+                    logger.debug('New connection to: %s:%d' % (host, port))
+
+                    return ssl_client
+                except socket.error:
+                    continue
+
+    return False
 
 def connectlocal(localhost, localport):
-    try:
-        localhost = socket.gethostbyname(localhost)
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((localhost, localport))
-        client.setblocking(1)
-        logger = logging.getLogger('%s:%d' % ('Conn', client.fileno()))
-        logger.debug('New connection to: %s:%d' % (localhost, localport))
-    except socket.error:
-        return False
+    ipv4_addr = list()
+    ipv6_addr = list()
 
-    return client
+    for res in socket.getaddrinfo(localhost, localport, socket.AF_UNSPEC, socket.SOCK_STREAM):
+        af, socktype, proto, canonname, sa = res
+
+        if dualstack_or == 1 or dualstack_or == 0:
+            if af == socket.AF_INET: ipv4_addr.append(res)
+        if dualstack_or == 2 or dualstack_or == 0:
+            if af == socket.AF_INET6: ipv6_addr.append(res)
+
+    if dualstack_or == 2 or dualstack_or == 0:
+        if len(ipv6_addr) > 0:
+            for res in ipv6_addr:
+                af, socktype, proto, canonname, sa = res
+                try:
+                    client = socket.socket(af, socktype, proto)
+                except socket.error:
+                    continue
+                try:
+                    client.connect(sa)
+                    client.setblocking(1)
+                    logger = logging.getLogger('%s:%d' % ('Conn', client.fileno()))
+                    logger.debug('New connection to: %s:%d' % (host, port))
+
+                    return client
+                except socket.error:
+                    continue
+
+    if dualstack_or == 1 or dualstack_or == 0:
+        if len(ipv4_addr) > 0:
+            for res in ipv4_addr:
+                af, socktype, proto, canonname, sa = res
+                try:
+                    client = socket.socket(af, socktype, proto)
+                except socket.error:
+                    continue
+                try:
+                    client.connect(sa)
+                    client.setblocking(1)
+                    logger = logging.getLogger('%s:%d' % ('Conn', client.fileno()))
+                    logger.debug('New connection to: %s:%d' % (host, port))
+
+                    return client
+                except socket.error:
+                    continue
+
+    return False
 
 def NgrokAuth():
     Payload = dict()
@@ -322,18 +373,12 @@ def HKClient(sock, linkstate, type, tosock = None):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger('%s' % 'client')
-    logger.info('python-ngrok v1.5')
+    logger.info('python-ngrok v1.52')
     while True:
         try:
             # 检测控制连接是否连接.
             if mainsocket == False:
-                ip = dnsopen(host)
-                if ip == False:
-                    logger = logging.getLogger('%s' % 'client')
-                    logger.info('update dns')
-                    time.sleep(10)
-                    continue
-                mainsocket = connectremote(ip, port)
+                mainsocket = connectremote(host, port)
                 if mainsocket == False:
                     logger = logging.getLogger('%s' % 'client')
                     logger.info('connect failed...!')

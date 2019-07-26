@@ -16,10 +16,10 @@ Python 2.7.9 或 Python 3.4.2 以上
 
 ***
 
-1.添加Ipv4/Ipv6双栈服务连接协议支持
-- 支持Ipv4/Ipv6格式地址及双栈域名地址解析,可分别设置服务连接及本地转发协议
+1.添加Ipv4/Ipv6双栈服务连接及本地转发协议支持
+- 支持数字格式地址及双栈域名地址解析,可分别设置服务连接及本地转发协议
 - 域名双栈协议优先级: Ipv6 > Ipv4
-- 参数说明: `dualstack or dualstack_or`
+- 双栈参数说明: `dualstack or dualstack_or`
 - 服务连接协议参数: dualstack [ipv4/ipv6=双栈, ipv4=ipv4, ipv6=ipv6]
 - 本地转发协议参数: dualstack_or [0=双栈, 1=ipv4, 2=ipv6]
 

@@ -12,7 +12,7 @@ Python 2.7.9 或 Python 3.4.2 以上
 # 温馨提示
 如果有小伙伴不想依赖环境运行，不妨可以试下PyInstaller，把py编译成可执行文件。
 
-注：随着IPv6加速普及，各大移动终端及宽带、网站、应用不断加速支持IPv6，本项目现已跟进IPv4/IPv6双栈协议支持。
+注：随着IPv6加速普及，各大移动终端及宽带、网站、应用不断加速支持IPv6，本项目现已跟进IPv4/IPv6双栈支持。
 
 ## 更新日记 v1.52(2019/07/27)
 
@@ -22,8 +22,8 @@ Python 2.7.9 或 Python 3.4.2 以上
 - 支持数字格式地址及双栈域名地址解析,可分别设置服务连接及本地转发协议
 - 域名双栈协议优先级: IPv6 > IPv4
 - 双栈参数说明: `dualstack or dualstack_or`
-- 服务连接协议参数: dualstack [IPv4/IPv6=双栈, IPv4=IPv4, IPv6=IPv6]
-- 本地转发协议参数: dualstack_or [0=双栈, 1=IPv4, 2=IPv6]
+- 服务连接协议参数: dualstack `[IPv4/IPv6=双栈, IPv4=IPv4, IPv6=IPv6]`
+- 本地转发协议参数: dualstack_or `[0=双栈, 1=IPv4, 2=IPv6]`
 
 2.删除旧版不支持的域名解析函数及旧版查询隧道信息函数
 

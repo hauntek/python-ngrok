@@ -17,8 +17,8 @@ host = 'tunnel.qydev.com' # Ngrok服务器地址
 port = 4443 # 端口
 bufsize = 1024 # 吞吐量
 
-dualstack = 'ipv4/ipv6' # 服务连接协议 [ipv4/ipv6=双栈]
-dualstack_or = 0 # 本地转发协议 [0=双栈, 1=ipv4, 2=ipv6]
+dualstack = 'IPv4/IPv6' # 服务连接协议 [IPv4/IPv6=双栈]
+dualstack_or = 0 # 本地转发协议 [0=双栈, 1=IPv4, 2=IPv6]
 
 Tunnels = list() # 全局渠道赋值
 body = dict()
@@ -92,12 +92,12 @@ def connectremote(host, port):
     for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
         af, socktype, proto, canonname, sa = res
 
-        if dualstack == 'ipv4' or dualstack == 'ipv4/ipv6':
+        if dualstack == 'IPv4' or dualstack == 'IPv4/IPv6':
             if af == socket.AF_INET: ipv4_addr.append(res)
-        if dualstack == 'ipv6' or dualstack == 'ipv4/ipv6':
+        if dualstack == 'IPv6' or dualstack == 'IPv4/IPv6':
             if af == socket.AF_INET6: ipv6_addr.append(res)
 
-    if dualstack == 'ipv6' or dualstack == 'ipv4/ipv6':
+    if dualstack == 'IPv6' or dualstack == 'IPv4/IPv6':
         if len(ipv6_addr) > 0:
             for res in ipv6_addr:
                 af, socktype, proto, canonname, sa = res
@@ -116,7 +116,7 @@ def connectremote(host, port):
                 except socket.error:
                     continue
 
-    if dualstack == 'ipv4' or dualstack == 'ipv4/ipv6':
+    if dualstack == 'IPv4' or dualstack == 'IPv4/IPv6':
         if len(ipv4_addr) > 0:
             for res in ipv4_addr:
                 af, socktype, proto, canonname, sa = res

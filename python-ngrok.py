@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 2.7.9 或 Python 3.4.2 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.52
+# Version: v1.56
 import socket
 import ssl
 import json
@@ -381,7 +381,7 @@ def HKClient(sock, linkstate, type, tosock = None):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger('%s' % 'client')
-    logger.info('python-ngrok v1.52')
+    logger.info('python-ngrok v1.56')
     while True:
         try:
             # 检测控制连接是否连接.

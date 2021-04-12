@@ -239,7 +239,15 @@ def lentobyte(len):
 def sendbuf(sock, buf, isblock = False):
     if isblock:
         sock.setblocking(1)
-    sock.sendall(buf)
+
+    buffer = buf
+    butlen = 0
+    while True:
+        sendlen = sock.send(buffer[butlen:butlen + 1024])
+        butlen += sendlen
+        if butlen == len(buffer):
+            break
+
     if isblock:
         sock.setblocking(0)
 

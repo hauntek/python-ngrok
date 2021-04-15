@@ -106,7 +106,7 @@ def ngrok_auth(options):
     port = 443
     try:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_TLSv1) # ssl.PROTOCOL_TLSv1_2
+        ssl_client = ssl.wrap_socket(client, ssl_version=ssl.PROTOCOL_TLSv1_2) # ssl.PROTOCOL_TLSv1_2
         ssl_client.connect((host, port))
     except Exception:
         print('连接认证服务器: https://www.ngrok.cc 错误.')

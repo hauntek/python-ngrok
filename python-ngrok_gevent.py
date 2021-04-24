@@ -315,8 +315,6 @@ def HKClient(sock, linkstate, type, tosock = None):
                             newsock = connectremote(host, port)
                             if newsock:
                                 gevent.spawn(HKClient, newsock, 0, 2)
-                                thread.setDaemon(True)
-                                thread.start()
                         if js['Type'] == 'AuthResp':
                             ClientId = js['Payload']['ClientId']
                             logger = logging.getLogger('%s' % 'client')

@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 2.7.9 或 Python 3.4.2 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: v1.58
+# Version: v1.56
 from gevent import monkey; monkey.patch_all()
 
 import socket

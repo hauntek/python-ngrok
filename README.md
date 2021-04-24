@@ -18,7 +18,7 @@ Python 2.7.9 或 Python 3.4.2 以上
 
 ***
 
-1.分块中转数据
+1.分块中转本地数据
 
 2.支持单线程异步协程[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
 - 需安装gevent库, 命令: `python -m pip install gevent`

@@ -20,6 +20,9 @@ Python 2.7.9 或 Python 3.4.2 以上
 
 1.分块中转数据
 
+2.添加单线程异步协程[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
+- 需安装gevent库, 命令: `python -m pip install gevent`
+
 ***
 
 ## 更新日记 v1.52(2019/07/27)

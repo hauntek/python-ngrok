@@ -14,13 +14,13 @@ Python 2.7.9 或 Python 3.4.2 以上
 
 注：随着IPv6加速普及，各大移动终端及宽带、网站、应用不断加速支持IPv6，本项目现已跟进IPv4/IPv6双栈支持。
 
-## 更新日记 v1.56(2021/04/13)
+## 更新日记 v1.56(2021/04/25)
 
 ***
 
 1.分块中转数据
 
-2.添加单线程异步协程[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
+2.支持单线程异步协程[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
 - 需安装gevent库, 命令: `python -m pip install gevent`
 
 ***

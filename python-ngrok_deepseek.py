@@ -166,23 +166,21 @@ class ProxyConnection:
     async def _cleanup(self):
         """资源清理"""
         self.running = False
-        try:
-            if self.proxy_writer:
-                self.proxy_writer.close()
-                await self.proxy_writer.wait_closed()
-            if self.local_writer:
-                self.local_writer.close()
-                await self.local_writer.wait_closed()
-        except Exception as e:
-            logger.debug(f"资源清理时发生错误: {str(e)}")
+        for writer in [self.proxy_writer, self.local_writer]:
+            if writer:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception as e:
+                    logger.debug(f"资源清理时发生错误: {str(e)}")
 
 class NgrokClient:
     def __init__(self, config: NgrokConfig):
         self.config = config
         self.client_id = ''
         self.last_ping = 0.0
-        self.main_reader: Optional[asyncio.StreamReader] = None
-        self.main_writer: Optional[asyncio.StreamWriter] = None
+        self.main_reader: asyncio.StreamReader | None = None
+        self.main_writer: asyncio.StreamWriter | None = None
         self.req_map: dict[str, tuple[str, int]] = {}
         self.tunnel_map: dict[str, tuple[str, int]] = {}
         self.proxy_connections: dict[str, ProxyConnection] = {}

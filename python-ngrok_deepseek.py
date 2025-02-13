@@ -7,6 +7,7 @@ import sys
 import time
 import logging
 import threading
+import asyncio
 from typing import Dict, Tuple, Optional, List
 
 logging.basicConfig(
@@ -22,7 +23,7 @@ class NgrokConfig:
         self.server_port = 4443
         self.bufsize = 4096
         self.dualstack = True
-        self.tunnels: List[dict] = []
+        self.tunnels: list[dict] = []
         
     @classmethod
     def from_file(cls, filename: str) -> 'NgrokConfig':
@@ -50,111 +51,213 @@ class NgrokConfig:
             raise
         return config
 
+class ProxyConnection:
+    """代理连接处理器"""
+    def __init__(self, client: 'NgrokClient'):
+        self.client = client
+        self.url = None
+        self.proxy_reader: asyncio.StreamReader | None = None
+        self.proxy_writer: asyncio.StreamWriter | None = None
+        self.local_reader: asyncio.StreamReader | None = None
+        self.local_writer: asyncio.StreamWriter | None = None
+        self.running = True
+        self.start_event = asyncio.Event()
+
+    async def start(self):
+        """启动代理连接全流程"""
+        try:
+            # 建立新的代理连接
+            await self._connect_proxy_server()
+            
+            # 发送RegProxy注册
+            await self._send_regproxy()
+
+            # 等待StartProxy消息
+            try:
+                await asyncio.wait_for(self.start_event.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                logger.error("等待StartProxy超时")
+                return
+                
+            if not self.url:
+                logger.error("未收到有效URL")
+                return
+
+            # 连接到本地服务
+            await self._connect_local_service()
+            
+            # 启动双向数据桥接
+            await self._bridge_data()
+
+        except Exception as e:
+            logger.error(f"代理连接失败: {str(e)}")
+        finally:
+            await self._cleanup()
+
+    async def _connect_proxy_server(self):
+        """连接到代理服务器"""
+        try:
+            self.proxy_reader, self.proxy_writer = await asyncio.open_connection(
+                host=self.client.config.server_host,
+                port=self.client.config.server_port,
+                ssl=self.client.ssl_ctx,
+                server_hostname=self.client.config.server_host
+            )
+            logger.debug(f"已建立代理连接到 {self.client.config.server_host}:{self.client.config.server_port}")
+        except Exception as e:
+            logger.error(f"代理服务器连接失败: {str(e)}")
+            raise
+
+    async def _send_regproxy(self):
+        """发送代理注册信息"""
+        regproxy_msg = {
+            'Type': 'RegProxy',
+            'Payload': {
+                'ClientId': self.client.client_id
+            }
+        }
+        await self._send_packet(regproxy_msg)
+        logger.debug(f"已发送RegProxy: {regproxy_msg}")
+
+    async def _connect_local_service(self):
+        """连接到本地服务"""
+        lhost, lport = self.client.tunnel_map[self.url]
+        try:
+            self.local_reader, self.local_writer = await asyncio.open_connection(
+                host=lhost,
+                port=lport
+            )
+            logger.info(f"已连接到本地服务 {lhost}:{lport}")
+        except Exception as e:
+            logger.error(f"本地服务连接失败: {str(e)}")
+            raise
+
+    async def _bridge_data(self):
+        """双向数据转发"""
+        async def forward(src: asyncio.StreamReader, dst: asyncio.StreamWriter, label: str):
+            try:
+                while self.running:
+                    data = await src.read(self.client.config.bufsize)
+                    if not data:
+                        logger.debug(f"{label} 连接正常关闭")
+                        break
+                    dst.write(data)
+                    await dst.drain()
+                    logger.debug(f"{label} 转发 {len(data)} bytes")
+            except Exception as e:
+                if self.running:
+                    logger.error(f"{label} 转发错误: {str(e)}")
+
+        await asyncio.gather(
+            forward(self.local_reader, self.proxy_writer, "本地->服务端"),
+            forward(self.proxy_reader, self.local_writer, "服务端->本地")
+        )
+
+    async def _send_packet(self, data: dict):
+        """发送协议数据包"""
+        try:
+            msg = json.dumps(data).encode('utf-8')
+            header = struct.pack('<II', len(msg), 0)
+            self.proxy_writer.write(header + msg)
+            await self.proxy_writer.drain()
+        except Exception as e:
+            logger.error(f"发送数据包失败: {str(e)}")
+            raise
+
+    async def _cleanup(self):
+        """资源清理"""
+        self.running = False
+        try:
+            if self.proxy_writer:
+                self.proxy_writer.close()
+                await self.proxy_writer.wait_closed()
+            if self.local_writer:
+                self.local_writer.close()
+                await self.local_writer.wait_closed()
+        except Exception as e:
+            logger.debug(f"资源清理时发生错误: {str(e)}")
+
 class NgrokClient:
     def __init__(self, config: NgrokConfig):
         self.config = config
         self.client_id = ''
         self.last_ping = 0.0
-        self.main_socket: Optional[ssl.SSLSocket] = None
-        self.req_map: Dict[str, Tuple[str, int]] = {}
-        self.tunnel_map: Dict[str, Tuple[str, int]] = {}
+        self.main_reader: Optional[asyncio.StreamReader] = None
+        self.main_writer: Optional[asyncio.StreamWriter] = None
+        self.req_map: dict[str, tuple[str, int]] = {}
+        self.tunnel_map: dict[str, tuple[str, int]] = {}
+        self.proxy_connections: dict[str, ProxyConnection] = {}
         self.lock = threading.Lock()
         self.running = True
-        
-        # 创建SSL上下文
-        self.ssl_ctx = ssl.create_default_context()
-        self.ssl_ctx.check_hostname = False
-        self.ssl_ctx.verify_mode = ssl.CERT_NONE
-        
-        # 验证隧道配置
+        self.ssl_ctx = self._create_ssl_context()
         self._validate_tunnels()
+
+    def _create_ssl_context(self) -> ssl.SSLContext:
+        """创建SSL上下文"""
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
 
     def _validate_tunnels(self):
         """验证隧道配置有效性"""
-        required = ['protocol', 'lhost', 'lport']
+        required_fields = ['protocol', 'lhost', 'lport']
         for t in self.config.tunnels:
-            for field in required:
+            for field in required_fields:
                 if field not in t:
                     raise ValueError(f"隧道配置缺少必要字段: {field}")
 
-    def _create_socket(self, af: int) -> Optional[socket.socket]:
-        """创建基础socket连接"""
+    async def _connect_server(self):
+        """连接到服务器"""
         try:
-            return socket.socket(af, socket.SOCK_STREAM)
-        except socket.error as e:
-            logger.debug(f"创建socket失败: {str(e)}")
-            return None
+            self.main_reader, self.main_writer = await asyncio.open_connection(
+                host=self.config.server_host,
+                port=self.config.server_port,
+                ssl=self.ssl_ctx,
+                server_hostname=self.config.server_host
+            )
+            logger.info(f"成功连接到服务器 {self.config.server_host}:{self.config.server_port}")
+        except Exception as e:
+            logger.error(f"服务器连接失败: {str(e)}")
+            raise
 
-    def connect_server(self) -> Optional[ssl.SSLSocket]:
-        """连接到Ngrok服务器"""
-        logger.info(f"正在连接服务器 {self.config.server_host}:{self.config.server_port}...")
-        
-        # 获取地址信息
-        addrinfo = socket.getaddrinfo(
-            self.config.server_host,
-            self.config.server_port,
-            family=socket.AF_UNSPEC,
-            type=socket.SOCK_STREAM
-        )
-
-        for res in sorted(addrinfo, key=lambda x: x[0] == socket.AF_INET6, reverse=True):
-            af, socktype, proto, _, sa = res
-            client = self._create_socket(af)
-            if not client:
-                continue
-
-            try:
-                client.settimeout(10)
-                client.connect(sa)
-                ssl_sock = self.ssl_ctx.wrap_socket(client, server_hostname=self.config.server_host)
-                ssl_sock.setblocking(False)
-                logger.info(f"成功连接到服务器 {sa[0]}:{sa[1]}")
-                return ssl_sock
-            except (socket.error, ssl.SSLError) as e:
-                logger.debug(f"连接失败 {sa}: {str(e)}")
-                client.close()
-
-        logger.error("无法连接到服务器")
-        return None
-
-    def _send_packet(self, sock: ssl.SSLSocket, data: dict):
-        """发送协议数据包"""
-        try:
-            msg = json.dumps(data).encode('utf-8')
-            header = struct.pack('<LL', len(msg), 0)
-            with self.lock:
-                sock.send(header + msg)
-                logger.debug(f"发送数据包: {data}")
-        except (OSError, ssl.SSLError) as e:
-            logger.error(f"发送数据失败: {str(e)}")
-            self._safe_close(sock)
-
-    def _safe_close(self, sock: Optional[ssl.SSLSocket]):
-        """安全关闭socket"""
-        if sock:
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-            except:
-                pass
-
-    def _handle_auth(self):
+    async def _handle_auth(self):
         """处理认证流程"""
         auth_msg = {
             'Type': 'Auth',
             'Payload': {
                 'ClientId': self.client_id,
-                'OS': 'python',
-                'Arch': 'universal',
-                'Version': '2.3',
+                'OS': 'darwin',
+                'Arch': 'amd64',
+                'Version': '2',
                 'MmVersion': '1.7',
                 'User': 'user',
                 'Password': ''
             }
         }
-        self._send_packet(self.main_socket, auth_msg)
+        await self._send_packet(auth_msg)
 
-    def _handle_req_tunnel(self):
+    async def _send_packet(self, data: dict):
+        """发送协议数据包"""
+        try:
+            msg = json.dumps(data).encode('utf-8')
+            header = struct.pack('<II', len(msg), 0)
+            self.main_writer.write(header + msg)
+            await self.main_writer.drain()
+            logger.debug(f"发送数据包: {data}")
+        except Exception as e:
+            logger.error(f"发送数据失败: {str(e)}")
+            self._safe_close()
+
+    def _safe_close(self):
+        """安全关闭连接"""
+        if self.main_writer:
+            try:
+                self.main_writer.close()
+            except:
+                pass
+
+    async def _handle_req_tunnel(self):
         """请求建立隧道"""
         for tunnel in self.config.tunnels:
             req_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=8))
@@ -171,46 +274,9 @@ class NgrokClient:
                     'HttpAuth': ''
                 }
             }
-            self._send_packet(self.main_socket, req_msg)
+            await self._send_packet(req_msg)
 
-    def _handle_proxy_connection(self, url: str):
-        """处理代理连接"""
-        if url not in self.tunnel_map:
-            logger.error(f"未知隧道URL: {url}")
-            return
-
-        lhost, lport = self.tunnel_map[url]
-        try:
-            with socket.create_connection((lhost, lport), timeout=10) as local_sock:
-                thread = threading.Thread(
-                    target=self._bridge_connections,
-                    args=(self.main_socket, local_sock)
-                )
-                thread.start()
-                thread.join()
-        except Exception as e:
-            logger.error(f"无法连接到本地服务 {lhost}:{lport}: {str(e)}")
-
-    def _bridge_connections(self, remote: ssl.SSLSocket, local: socket.socket):
-        """桥接两个连接"""
-        try:
-            while self.running:
-                r, _, _ = select.select([remote, local], [], [], 1)
-                for sock in r:
-                    data = sock.recv(self.config.bufsize)
-                    if not data:
-                        return
-                    if sock is remote:
-                        local.sendall(data)
-                    else:
-                        remote.sendall(data)
-        except:
-            pass
-        finally:
-            self._safe_close(remote)
-            local.close()
-
-    def _process_message(self, sock: ssl.SSLSocket, msg: dict):
+    async def _process_message(self, msg: dict):
         """处理服务器消息"""
         msg_type = msg.get('Type', '')
         payload = msg.get('Payload', {})
@@ -218,9 +284,8 @@ class NgrokClient:
         if msg_type == 'AuthResp':
             self.client_id = payload.get('ClientId', '')
             logger.info(f"认证成功，客户端ID: {self.client_id}")
-            self._send_packet(sock, {'Type': 'Ping'})
+            await self._handle_req_tunnel()
             self.last_ping = time.time()
-            self._handle_req_tunnel()
 
         elif msg_type == 'NewTunnel':
             if payload.get('Error'):
@@ -230,24 +295,33 @@ class NgrokClient:
                 self.tunnel_map[url] = self.req_map.get(payload['ReqId'], ('', 0))
                 logger.info(f"隧道已建立: {url}")
 
+        elif msg_type == 'ReqProxy':
+            ogger.info(f"收到代理请求，启动新连接...")
+            proxy_conn = ProxyConnection(self)
+            asyncio.create_task(proxy_conn.start())
+
         elif msg_type == 'StartProxy':
-            self._handle_proxy_connection(payload['Url'])
+            url = payload['Url']
+            logger.info(f"收到StartProxy，URL: {url}")
+            if proxy_conn := self.proxy_connections.get(url):
+                proxy_conn.url = url
+                proxy_conn.start_event.set()
+            else:
+                logger.error(f"未找到对应的代理连接: {url}")
 
         elif msg_type == 'Pong':
             self.last_ping = time.time()
+            logger.debug("收到心跳响应")
 
-    def _recv_loop(self, sock: ssl.SSLSocket):
+    async def _recv_loop(self):
         """接收数据主循环"""
-        buffer = b''
-        while self.running:
-            try:
-                data = sock.recv(self.config.bufsize)
-                if not data:
-                    break
-
+        try:
+            buffer = b''
+            while self.running:
+                data = await self.main_reader.read(4096)
                 buffer += data
                 while len(buffer) >= 8:
-                    msg_len = struct.unpack('<LL', buffer[:8])[0]
+                    msg_len = struct.unpack('<II', buffer[:8])[0]
                     if len(buffer) < msg_len + 8:
                         break
 
@@ -257,47 +331,54 @@ class NgrokClient:
                     try:
                         msg = json.loads(msg_data.decode('utf-8'))
                         logger.debug(f"收到消息: {msg}")
-                        self._process_message(sock, msg)
+                        await self._process_message(msg)
                     except json.JSONDecodeError:
                         logger.error("消息解析失败")
 
-            except (ssl.SSLError, socket.error) as e:
-                logger.error(f"连接错误: {str(e)}")
-                break
 
-        self.running = False
-        self._safe_close(sock)
+        except (asyncio.IncompleteReadError, ConnectionError) as e:
+            logger.error(f"连接中断: {str(e)}")
+        except Exception as e:
+            logger.error(f"接收数据时发生错误: {str(e)}")
+        finally:
+            self.running = False
+            self._safe_close()
 
-    def start(self):
-        """启动客户端主循环"""
+    async def _heartbeat_task(self):
+        """心跳任务"""
         while self.running:
-            if not self.main_socket:
-                self.main_socket = self.connect_server()
-                if not self.main_socket:
-                    time.sleep(5)
-                    continue
-
-                # 启动认证流程
-                self._handle_auth()
-                threading.Thread(target=self._recv_loop, args=(self.main_socket,)).start()
-
-            # 心跳处理
-            if time.time() - self.last_ping > 20 and self.last_ping > 0:
+            if time.time() - self.last_ping > 20:
                 try:
-                    self._send_packet(self.main_socket, {'Type': 'Ping'})
+                    await self._send_packet({'Type': 'Ping'})
                     self.last_ping = time.time()
-                except:
-                    self.main_socket = None
+                except Exception as e:
+                    logger.error(f"发送心跳失败: {str(e)}")
+                    self.running = False
+            await asyncio.sleep(1)
 
-            time.sleep(1)
+    async def start(self):
+        """启动客户端主循环"""
+        try:
+            await self._connect_server()
+            await self._handle_auth()
+            
+            # 启动接收和心跳任务
+            await asyncio.gather(
+                self._recv_loop(),
+                self._heartbeat_task()
+            )
 
-        logger.info("客户端已停止")
+        except Exception as e:
+            logger.error(f"客户端启动失败: {str(e)}")
+        finally:
+            self._safe_close()
+            logger.info("客户端已停止")
 
 if __name__ == '__main__':
     try:
         config = NgrokConfig.from_file(sys.argv[1]) if len(sys.argv) > 1 else NgrokConfig()
         client = NgrokClient(config)
-        client.start()
+        asyncio.run(client.start())
     except KeyboardInterrupt:
         logger.info("用户中断操作")
     except Exception as e:

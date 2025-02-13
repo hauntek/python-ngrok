@@ -293,7 +293,7 @@ class NgrokClient:
                 logger.info(f"隧道已建立: {url}")
 
         elif msg_type == 'ReqProxy':
-            ogger.info(f"收到代理请求，启动新连接...")
+            logger.info(f"收到代理请求，启动新连接...")
             proxy_conn = ProxyConnection(self)
             asyncio.create_task(proxy_conn.start())
 

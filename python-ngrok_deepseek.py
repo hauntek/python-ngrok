@@ -10,7 +10,7 @@ import threading
 import asyncio
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
     datefmt='%Y/%m/%d %H:%M:%S'
 )
@@ -60,7 +60,6 @@ class ProxyConnection:
         self.local_reader: asyncio.StreamReader | None = None
         self.local_writer: asyncio.StreamWriter | None = None
         self.running = True
-        self.start_event = asyncio.Event()
 
     async def start(self):
         """启动代理连接全流程"""
@@ -72,12 +71,7 @@ class ProxyConnection:
             await self._send_regproxy()
 
             # 等待StartProxy消息
-            try:
-                await asyncio.wait_for(self.start_event.wait(), timeout=30)
-            except asyncio.TimeoutError:
-                logger.error("等待StartProxy超时")
-                return
-                
+            self.url = await self._message_loop_until_startproxy()
             if not self.url:
                 logger.error("未收到有效URL")
                 return
@@ -88,6 +82,8 @@ class ProxyConnection:
             # 启动双向数据桥接
             await self._bridge_data()
 
+        except asyncio.TimeoutError:
+            logger.error("等待StartProxy消息超时")
         except Exception as e:
             logger.error(f"代理连接失败: {str(e)}")
         finally:
@@ -130,6 +126,24 @@ class ProxyConnection:
         except Exception as e:
             logger.error(f"本地服务连接失败: {str(e)}")
             raise
+
+    async def _message_loop_until_startproxy(self):
+        """持续接收消息，直到收到StartProxy"""
+        buffer = b''
+        while True:
+            data = await asyncio.wait_for(self.proxy_reader.read(4096), timeout=30)
+            buffer += data
+            while len(buffer) >= 8:
+                msg_len = struct.unpack('<II', buffer[:8])[0]
+                if len(buffer) < msg_len + 8:
+                    break
+                msg_data = buffer[8:8+msg_len]
+                buffer = buffer[8+msg_len:]
+                msg = json.loads(msg_data.decode('utf-8'))
+                if msg.get('Type') == 'StartProxy':
+                    return msg['Payload']['Url']
+
+        return ''
 
     async def _bridge_data(self):
         """双向数据转发"""
@@ -183,7 +197,6 @@ class NgrokClient:
         self.main_writer: asyncio.StreamWriter | None = None
         self.req_map: dict[str, tuple[str, int]] = {}
         self.tunnel_map: dict[str, tuple[str, int]] = {}
-        self.proxy_connections: dict[str, ProxyConnection] = {}
         self.lock = threading.Lock()
         self.running = True
         self.ssl_ctx = self._create_ssl_context()
@@ -296,15 +309,6 @@ class NgrokClient:
             logger.info(f"收到代理请求，启动新连接...")
             proxy_conn = ProxyConnection(self)
             asyncio.create_task(proxy_conn.start())
-
-        elif msg_type == 'StartProxy':
-            url = payload['Url']
-            logger.info(f"收到StartProxy，URL: {url}")
-            if proxy_conn := self.proxy_connections.get(url):
-                proxy_conn.url = url
-                proxy_conn.start_event.set()
-            else:
-                logger.error(f"未找到对应的代理连接: {url}")
 
         elif msg_type == 'Pong':
             self.last_ping = time.time()

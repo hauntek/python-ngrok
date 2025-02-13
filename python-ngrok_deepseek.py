@@ -8,7 +8,6 @@ import time
 import logging
 import threading
 import asyncio
-from typing import Dict, Tuple, Optional, List
 
 logging.basicConfig(
     level=logging.INFO,

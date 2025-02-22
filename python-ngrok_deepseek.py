@@ -6,7 +6,6 @@ import random
 import sys
 import time
 import logging
-import threading
 import asyncio
 
 logging.basicConfig(
@@ -20,10 +19,36 @@ class NgrokConfig:
     def __init__(self):
         self.server_host = 'tunnel.qydev.com'
         self.server_port = 4443
-        self.bufsize = 4096
-        self.dualstack = True
+        self.bufsize = 1024
         self.tunnels: list[dict] = []
-        
+
+        body = dict()
+        body['protocol'] = 'http'
+        body['hostname'] = 'www.xxx.com'
+        body['subdomain'] = ''
+        body['rport'] = 0
+        body['lhost'] = '127.0.0.1'
+        body['lport'] = 80
+        self.tunnels.append(body) # 加入渠道队列
+
+        body = dict()
+        body['protocol'] = 'http'
+        body['hostname'] = ''
+        body['subdomain'] = 'xxx'
+        body['rport'] = 0
+        body['lhost'] = '127.0.0.1'
+        body['lport'] = 80
+        self.tunnels.append(body) # 加入渠道队列
+
+        body = dict()
+        body['protocol'] = 'tcp'
+        body['hostname'] = ''
+        body['subdomain'] = ''
+        body['rport'] = 55499
+        body['lhost'] = '127.0.0.1'
+        body['lport'] = 22
+        self.tunnels.append(body) # 加入渠道队列
+
     @classmethod
     def from_file(cls, filename: str) -> 'NgrokConfig':
         """从配置文件加载配置"""
@@ -33,7 +58,7 @@ class NgrokConfig:
                 data = json.load(f)
                 config.server_host = data["server"]["host"]
                 config.server_port = int(data["server"]["port"])
-                config.bufsize = int(data["server"].get("bufsize", 4096))
+                config.bufsize = int(data["server"].get("bufsize", 1024))
                 config.tunnels = [
                     {
                         'protocol': t["protocol"],
@@ -78,7 +103,7 @@ class ProxyConnection:
 
             # 连接到本地服务
             await self._connect_local_service()
-            
+
             # 启动双向数据桥接
             await self._bridge_data()
 
@@ -131,17 +156,22 @@ class ProxyConnection:
         """持续接收消息，直到收到StartProxy"""
         buffer = b''
         while True:
-            data = await asyncio.wait_for(self.proxy_reader.read(4096), timeout=30)
+            data = await asyncio.wait_for(self.proxy_reader.read(self.client.config.bufsize), timeout=30)
             buffer += data
             while len(buffer) >= 8:
                 msg_len = struct.unpack('<II', buffer[:8])[0]
                 if len(buffer) < msg_len + 8:
                     break
+
                 msg_data = buffer[8:8+msg_len]
                 buffer = buffer[8+msg_len:]
-                msg = json.loads(msg_data.decode('utf-8'))
-                if msg.get('Type') == 'StartProxy':
-                    return msg['Payload']['Url']
+
+                try:
+                    msg = json.loads(msg_data.decode('utf-8'))
+                    if msg.get('Type') == 'StartProxy':
+                        return msg['Payload']['Url']
+                except json.JSONDecodeError:
+                    logger.error("消息解析失败")
 
         return ''
 
@@ -170,7 +200,7 @@ class ProxyConnection:
         """发送协议数据包"""
         try:
             msg = json.dumps(data).encode('utf-8')
-            header = struct.pack('<II', len(msg), 0)
+            header = struct.pack('<LL', len(msg), 0)
             self.proxy_writer.write(header + msg)
             await self.proxy_writer.drain()
         except Exception as e:
@@ -197,7 +227,7 @@ class NgrokClient:
         self.main_writer: asyncio.StreamWriter | None = None
         self.req_map: dict[str, tuple[str, int]] = {}
         self.tunnel_map: dict[str, tuple[str, int]] = {}
-        self.lock = threading.Lock()
+        self.lock = asyncio.Lock()
         self.running = True
         self.ssl_ctx = self._create_ssl_context()
         self._validate_tunnels()
@@ -251,7 +281,7 @@ class NgrokClient:
         """发送协议数据包"""
         try:
             msg = json.dumps(data).encode('utf-8')
-            header = struct.pack('<II', len(msg), 0)
+            header = struct.pack('<LL', len(msg), 0)
             self.main_writer.write(header + msg)
             await self.main_writer.drain()
             logger.debug(f"发送数据包: {data}")
@@ -270,7 +300,7 @@ class NgrokClient:
     async def _handle_req_tunnel(self):
         """请求建立隧道"""
         for tunnel in self.config.tunnels:
-            req_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=8))
+            req_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz', k=8))
             self.req_map[req_id] = (tunnel['lhost'], tunnel['lport'])
             
             req_msg = {
@@ -319,7 +349,7 @@ class NgrokClient:
         try:
             buffer = b''
             while self.running:
-                data = await self.main_reader.read(4096)
+                data = await self.main_reader.read(self.config.bufsize)
                 buffer += data
                 while len(buffer) >= 8:
                     msg_len = struct.unpack('<II', buffer[:8])[0]
@@ -335,7 +365,6 @@ class NgrokClient:
                         await self._process_message(msg)
                     except json.JSONDecodeError:
                         logger.error("消息解析失败")
-
 
         except (asyncio.IncompleteReadError, ConnectionError) as e:
             logger.error(f"连接中断: {str(e)}")

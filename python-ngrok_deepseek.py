@@ -137,7 +137,6 @@ class ProxyConnection:
             }
         }
         await self._send_packet(regproxy_msg)
-        logger.debug(f"已发送RegProxy: {regproxy_msg}")
 
     async def _connect_local_service(self):
         """连接到本地服务"""
@@ -203,6 +202,7 @@ class ProxyConnection:
             header = struct.pack('<LL', len(msg), 0)
             self.proxy_writer.write(header + msg)
             await self.proxy_writer.drain()
+            logger.debug(f"发送数据包: {data}")
         except Exception as e:
             logger.error(f"发送数据包失败: {str(e)}")
             raise
@@ -210,6 +210,7 @@ class ProxyConnection:
     async def _cleanup(self):
         """资源清理"""
         self.running = False
+
         for writer in [self.proxy_writer, self.local_writer]:
             if writer:
                 try:
@@ -218,6 +219,9 @@ class ProxyConnection:
                 except Exception as e:
                     logger.debug(f"资源清理时发生错误: {str(e)}")
 
+        if self in self.client.proxy_connections:
+            self.client.proxy_connections.remove(self)
+
 class NgrokClient:
     def __init__(self, config: NgrokConfig):
         self.config = config
@@ -225,11 +229,12 @@ class NgrokClient:
         self.last_ping = 0.0
         self.main_reader: asyncio.StreamReader | None = None
         self.main_writer: asyncio.StreamWriter | None = None
+        self.ssl_ctx = self._create_ssl_context()
         self.req_map: dict[str, tuple[str, int]] = {}
         self.tunnel_map: dict[str, tuple[str, int]] = {}
+        self.proxy_connections = []
         self.lock = asyncio.Lock()
         self.running = True
-        self.ssl_ctx = self._create_ssl_context()
         self._validate_tunnels()
 
     def _create_ssl_context(self) -> ssl.SSLContext:
@@ -286,16 +291,18 @@ class NgrokClient:
             await self.main_writer.drain()
             logger.debug(f"发送数据包: {data}")
         except Exception as e:
-            logger.error(f"发送数据失败: {str(e)}")
-            self._safe_close()
+            logger.error(f"发送数据包失败: {str(e)}")
+            raise
 
     def _safe_close(self):
         """安全关闭连接"""
         if self.main_writer:
             try:
                 self.main_writer.close()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"关闭连接时发生错误: {str(e)}")
+            finally:
+                self.main_writer = None
 
     async def _handle_req_tunnel(self):
         """请求建立隧道"""
@@ -338,6 +345,7 @@ class NgrokClient:
         elif msg_type == 'ReqProxy':
             logger.info(f"收到代理请求，启动新连接...")
             proxy_conn = ProxyConnection(self)
+            self.proxy_connections.append(proxy_conn)
             asyncio.create_task(proxy_conn.start())
 
         elif msg_type == 'Pong':

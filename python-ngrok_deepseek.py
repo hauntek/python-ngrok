@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+# 建议Python 3.10.0 以上运行
+# 项目地址: https://github.com/hauntek/python-ngrok
+# Version: 2.0.0
 import socket
 import ssl
 import json

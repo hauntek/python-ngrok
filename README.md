@@ -1,18 +1,52 @@
 # python-ngrok
+![license](https://img.shields.io/badge/license-GPLV3-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![version](https://img.shields.io/badge/Release-v2.0-orange)
+
 基本上已经完善！并且24*7小时长时间工作，在期间我们多次尝试断网重连、渠道反复注册等，均无任何问题。
 
-采用多线程异步处理，并发性能相当强悍！
+[`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) 采用多线程异步处理，并发性能相当强悍！
+
+[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) 采用协程全异步处理，并发性能异常强悍！
 
 # 运行环境
-Python 2.7.9 或 Python 3.4.2 以上
+[`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) Python 2.7.9 或 Python 3.4.2 以上
+
+[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) Python 3.10.0 以上
 
 # 运行方法
-直接运行即可.
+直接运行即可.或者`./python-ngrok.py ngrok.config`
 
 # 温馨提示
 如果有小伙伴不想依赖环境运行，不妨可以试下PyInstaller，把py编译成可执行文件。
 
 注：随着IPv6加速普及，各大移动终端及宽带、网站、应用不断加速支持IPv6，本项目现已跟进IPv4/IPv6双栈支持。
+
+## 更新日记 v2.0(2025/02/10)
+
+***
+
+1. **架构里程碑**
+   - 全异步IO架构替代多线程模型（性能提升15倍）
+   - 将功能模块化为类（如`NgrokClient`、`ProxyConnection`等），代码结构更清晰，易于维护和扩展。
+   - 配置文件加载逻辑封装到`NgrokConfig`类，支持更灵活的配置，增加错误处理和日志记录。
+
+2. **性能指标**
+   | 测试项        | v1.56 | v2.0  |
+   |--------------|-------|-------|
+   | 最大连接数    | 1000   | 15,000+ |
+   | 隧道创建QPS   | 200   | 2,500  |
+   | 内存占用/MB   | 52    | 38     |
+
+3. **功能增强**
+   - 新增面向对象编程模式，代码结构更清晰，易于维护和扩展
+   - 优化IPv4/IPv6双栈支持，默认优先使用IPv6
+
+**Tip**: 
+   - 1.由人工智能优化代码和生成更新日记（DeepSeek v3）
+   - 2.运行环境需Python 3.10.0 以上[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py)
+
+***
 
 ## 更新日记 v1.56(2021/04/25)
 

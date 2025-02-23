@@ -164,24 +164,18 @@ class ProxyConnection:
 
     async def _message_loop_until_startproxy(self):
         """持续接收消息，直到收到StartProxy"""
-        buffer = b''
         while True:
-            data = await asyncio.wait_for(self.proxy_reader.read(self.client.config.bufsize), timeout=30)
-            buffer += data
-            while len(buffer) >= 8:
-                msg_len = struct.unpack('<II', buffer[:8])[0]
-                if len(buffer) < msg_len + 8:
-                    break
-
-                msg_data = buffer[8:8+msg_len]
-                buffer = buffer[8+msg_len:]
-
-                try:
-                    msg = json.loads(msg_data.decode('utf-8'))
-                    if msg.get('Type') == 'StartProxy':
-                        return msg['Payload']['Url']
-                except json.JSONDecodeError:
-                    logger.error("消息解析失败")
+            header = await self.proxy_reader.read(8)
+            if not header:
+                break
+            try:
+                msg_len, _ = struct.unpack('<II', header)
+                msg = json.loads(await self.proxy_reader.read(msg_len))
+                logger.debug(f"收到消息: {msg}")
+                if msg.get('Type') == 'StartProxy':
+                    return msg['Payload']['Url']
+            except json.JSONDecodeError:
+                logger.error("消息解析失败")
 
         return ''
 
@@ -358,10 +352,11 @@ class NgrokClient:
                 logger.info(f"隧道已建立: {url}")
 
         elif msg_type == 'ReqProxy':
-            logger.info(f"收到代理请求，启动新连接...")
-            proxy_conn = ProxyConnection(self)
-            self.proxy_connections.append(proxy_conn)
-            asyncio.create_task(proxy_conn.start())
+            async with self.lock:
+                logger.info(f"收到代理请求，启动新连接...")
+                proxy_conn = ProxyConnection(self)
+                self.proxy_connections.append(proxy_conn)
+                asyncio.create_task(proxy_conn.start())
 
         elif msg_type == 'Pong':
             self.last_ping = time.time()
@@ -370,24 +365,17 @@ class NgrokClient:
     async def _recv_loop(self):
         """接收数据主循环"""
         try:
-            buffer = b''
             while self.running:
-                data = await self.main_reader.read(self.config.bufsize)
-                buffer += data
-                while len(buffer) >= 8:
-                    msg_len = struct.unpack('<II', buffer[:8])[0]
-                    if len(buffer) < msg_len + 8:
-                        break
-
-                    msg_data = buffer[8:8+msg_len]
-                    buffer = buffer[8+msg_len:]
-                    
-                    try:
-                        msg = json.loads(msg_data.decode('utf-8'))
-                        logger.debug(f"收到消息: {msg}")
-                        await self._process_message(msg)
-                    except json.JSONDecodeError:
-                        logger.error("消息解析失败")
+                header = await self.main_reader.read(8)
+                if not header:
+                    break
+                try:
+                    msg_len, _ = struct.unpack('<II', header)
+                    msg = json.loads(await self.main_reader.read(msg_len))
+                    logger.debug(f"收到消息: {msg}")
+                    await self._process_message(msg)
+                except json.JSONDecodeError:
+                    logger.error("消息解析失败")
 
         except (asyncio.IncompleteReadError, ConnectionError) as e:
             logger.error(f"连接中断: {str(e)}")

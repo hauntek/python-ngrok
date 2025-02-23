@@ -25,12 +25,14 @@ class NgrokConfig:
         self.server_host = 'tunnel.qydev.com'
         self.server_port = 4443
         self.bufsize = 1024
+        self.authtoken = ''
         self.tunnels: list[dict] = []
 
         body = dict()
         body['protocol'] = 'http'
         body['hostname'] = 'www.xxx.com'
         body['subdomain'] = ''
+        body['httpauth'] = ''
         body['rport'] = 0
         body['lhost'] = '127.0.0.1'
         body['lport'] = 80
@@ -40,6 +42,7 @@ class NgrokConfig:
         body['protocol'] = 'http'
         body['hostname'] = ''
         body['subdomain'] = 'xxx'
+        body['httpauth'] = ''
         body['rport'] = 0
         body['lhost'] = '127.0.0.1'
         body['lport'] = 80
@@ -49,6 +52,7 @@ class NgrokConfig:
         body['protocol'] = 'tcp'
         body['hostname'] = ''
         body['subdomain'] = ''
+        body['httpauth'] = ''
         body['rport'] = 55499
         body['lhost'] = '127.0.0.1'
         body['lport'] = 22
@@ -64,11 +68,13 @@ class NgrokConfig:
                 config.server_host = data["server"]["host"]
                 config.server_port = int(data["server"]["port"])
                 config.bufsize = int(data["server"].get("bufsize", 1024))
+                config.authtoken = data["server"].get("authtoken", "")
                 config.tunnels = [
                     {
                         'protocol': t["protocol"],
                         'hostname': t.get("hostname", ""),
                         'subdomain': t.get("subdomain", ""),
+                        'httpauth': t.get("httpauth", ""),
                         'rport': int(t.get("rport", 0)),
                         'lhost': t["lhost"],
                         'lport': int(t["lport"])
@@ -231,7 +237,6 @@ class NgrokClient:
     def __init__(self, config: NgrokConfig):
         self.config = config
         self.client_id = ''
-        self.authtoken = 'user'
         self.last_ping = 0.0
         self.main_reader: asyncio.StreamReader | None = None
         self.main_writer: asyncio.StreamWriter | None = None
@@ -282,7 +287,7 @@ class NgrokClient:
                 'Arch': 'amd64',
                 'Version': '2',
                 'MmVersion': '1.7',
-                'User': self.authtoken,
+                'User': self.config.authtoken,
                 'Password': ''
             }
         }
@@ -323,8 +328,8 @@ class NgrokClient:
                     'Protocol': tunnel['protocol'],
                     'Hostname': tunnel['hostname'],
                     'Subdomain': tunnel['subdomain'],
-                    'RemotePort': tunnel['rport'],
-                    'HttpAuth': ''
+                    'HttpAuth': tunnel['httpauth'],
+                    'RemotePort': tunnel['rport']
                 }
             }
             await self._send_packet(req_msg)

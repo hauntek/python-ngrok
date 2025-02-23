@@ -340,10 +340,14 @@ class NgrokClient:
         payload = msg.get('Payload', {})
 
         if msg_type == 'AuthResp':
-            self.client_id = payload.get('ClientId', '')
-            logger.info(f"认证成功，客户端ID: {self.client_id}")
-            await self._handle_req_tunnel()
-            self.last_ping = time.time()
+            if payload.get('Error'):
+                logger.error(f"认证失败: {payload['Error']}")
+                self.running = False
+            else:
+                self.client_id = payload.get('ClientId', '')
+                logger.info(f"认证成功，客户端ID: {self.client_id}")
+                await self._handle_req_tunnel()
+                self.last_ping = time.time()
 
         elif msg_type == 'NewTunnel':
             if payload.get('Error'):

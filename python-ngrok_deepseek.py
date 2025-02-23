@@ -231,6 +231,7 @@ class NgrokClient:
     def __init__(self, config: NgrokConfig):
         self.config = config
         self.client_id = ''
+        self.authtoken = 'user'
         self.last_ping = 0.0
         self.main_reader: asyncio.StreamReader | None = None
         self.main_writer: asyncio.StreamWriter | None = None
@@ -281,7 +282,7 @@ class NgrokClient:
                 'Arch': 'amd64',
                 'Version': '2',
                 'MmVersion': '1.7',
-                'User': 'user',
+                'User': self.authtoken,
                 'Password': ''
             }
         }

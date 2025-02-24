@@ -1,7 +1,7 @@
 # python-ngrok
 ![license](https://img.shields.io/badge/license-GPLV3-blue)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![version](https://img.shields.io/badge/Release-v2.0-orange)
+![version](https://img.shields.io/badge/Release-v2.1-orange)
 
 基本上已经完善！并且24*7小时长时间工作，在期间我们多次尝试断网重连、渠道反复注册等，均无任何问题。
 
@@ -23,6 +23,23 @@
 
 # 温馨提示
 如果有小伙伴不想依赖环境运行，不妨可以试下PyInstaller，把py编译成可执行文件。
+
+## 更新日记 v2.1(2025/02/25)
+
+***
+
+1. **功能增强**
+   - 支持UDP隧道注册及新增UDP本地连接转发
+
+2. **功能修复**
+   - 长时间接收不到`StartProxy`消息，不会检测超时导致的堵塞
+   - 调整接收消息机制，避免接收`StartProxy`消息粘包，导致无法双向数据转发
+
+**Tip**: 
+   - 1.由人工智能优化代码和生成更新日记（DeepSeek v3）
+   - 2.运行环境需Python 3.10.0 以上[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py)
+
+***
 
 ## 更新日记 v2.0(2025/02/23)
 

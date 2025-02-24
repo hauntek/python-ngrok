@@ -57,8 +57,8 @@
 
 1.本地数据分块转发
 
-2.基于`gevent`替换为多协程全异步处理[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
-- 需安装gevent库, 命令: `python -m pip install gevent`
+2.通过`gevent`替换为多协程全异步处理[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
+- 需安装gevent依赖库, 命令: `python -m pip install gevent`
 
 ***
 

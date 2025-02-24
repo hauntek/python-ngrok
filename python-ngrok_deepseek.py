@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 3.10.0 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: 2.0.0
+# Version: 2.1.0
 import socket
 import ssl
 import json
@@ -58,6 +58,16 @@ class NgrokConfig:
         body['lport'] = 22
         self.tunnels.append(body) # 加入渠道队列
 
+        body = dict()
+        body['protocol'] = 'udp'
+        body['hostname'] = ''
+        body['subdomain'] = ''
+        body['httpauth'] = ''
+        body['rport'] = 55499
+        body['lhost'] = '127.0.0.1'
+        body['lport'] = 53
+        self.tunnels.append(body) # 加入渠道队列
+
     @classmethod
     def from_file(cls, filename: str) -> 'NgrokConfig':
         """从配置文件加载配置"""
@@ -95,6 +105,8 @@ class ProxyConnection:
         self.proxy_writer: asyncio.StreamWriter | None = None
         self.local_reader: asyncio.StreamReader | None = None
         self.local_writer: asyncio.StreamWriter | None = None
+        self.udp_transport: asyncio.DatagramTransport | None = None
+        self.remote_addr = None
         self.running = True
 
     async def start(self):
@@ -109,14 +121,21 @@ class ProxyConnection:
             # 等待StartProxy消息
             self.url = await self._message_loop_until_startproxy()
             if not self.url:
-                logger.error("未收到有效URL")
+                logger.debug("未收到有效URL")
+                return
+
+            protocol = self.url.split(":")[0]
+            if protocol == 'udp':
+                # 连接到本地服务
+                await self._connect_local_service_udp()
+                # 启动双向数据桥接
+                await self._bridge_data_udp()
                 return
 
             # 连接到本地服务
-            await self._connect_local_service()
-
+            await self._connect_local_service_tcp()
             # 启动双向数据桥接
-            await self._bridge_data()
+            await self._bridge_data_tcp()
 
         except Exception as e:
             logger.error(f"代理连接失败: {str(e)}")
@@ -147,37 +166,103 @@ class ProxyConnection:
         }
         await self._send_packet(regproxy_msg)
 
-    async def _connect_local_service(self):
-        """连接到本地服务"""
+    async def _message_loop_until_startproxy(self):
+        """持续接收消息，直到收到StartProxy"""
+        while True:
+            header = await asyncio.wait_for(self.proxy_reader.read(8), timeout=60)
+            if not header:
+                break
+            try:
+                msg_len, _ = struct.unpack('<II', header)
+                msg = json.loads(await asyncio.wait_for(self.proxy_reader.read(msg_len), timeout=60))
+                logger.debug(f"收到消息: {msg}")
+                if msg.get('Type') == 'StartProxy':
+                    return msg['Payload']['Url']
+            except asyncio.TimeoutError:
+                break
+            except json.JSONDecodeError:
+                logger.error("消息解析失败")
+
+        return ''
+
+    async def _connect_local_service_udp(self):
+        class LocalProtocol:
+            def __init__(self, proxy_conn: 'ProxyConnection'):
+                self.proxy_conn = proxy_conn
+                self.local_reader = asyncio.StreamReader()
+                self.remote_addr = None
+
+            def connection_made(self, transport):
+                pass
+
+            def datagram_received(self, data, addr):
+                self.remote_addr = addr
+                self.local_reader.feed_data(data)
+
+            def error_received(self, exc):
+                logger.error(f"UDP 错误: {exc}")
+
+            def connection_lost(self, exc):
+                pass
+
+        """连接到本地UDP服务"""
+        lhost, lport = self.client.tunnel_map[self.url]
+        try:
+            loop = asyncio.get_running_loop()
+            transport, protocol = await loop.create_datagram_endpoint(
+                lambda: LocalProtocol(self),
+                remote_addr=(lhost, lport)
+            )
+            self.udp_transport = transport
+            self.local_reader = protocol.local_reader
+            self.remote_addr = protocol.remote_addr
+            logger.info(f"已连接到本地 UDP 服务 {lhost}:{lport}")
+        except Exception as e:
+            logger.error(f"本地 UDP 服务连接失败: {str(e)}")
+            raise
+
+    async def _connect_local_service_tcp(self):
+        """连接到本地TCP服务"""
         lhost, lport = self.client.tunnel_map[self.url]
         try:
             self.local_reader, self.local_writer = await asyncio.open_connection(
                 host=lhost,
                 port=lport
             )
-            logger.info(f"已连接到本地服务 {lhost}:{lport}")
+            logger.info(f"已连接到本地 TCP 服务 {lhost}:{lport}")
         except Exception as e:
-            logger.error(f"本地服务连接失败: {str(e)}")
+            logger.error(f"本地 TCP 服务连接失败: {str(e)}")
             raise
 
-    async def _message_loop_until_startproxy(self):
-        """持续接收消息，直到收到StartProxy"""
-        while True:
-            header = await self.proxy_reader.read(8)
-            if not header:
-                break
+    async def _bridge_data_udp(self):
+        """双向数据转发"""
+        async def transfer(src, dst_is_udp: bool, label):
             try:
-                msg_len, _ = struct.unpack('<II', header)
-                msg = json.loads(await self.proxy_reader.read(msg_len))
-                logger.debug(f"收到消息: {msg}")
-                if msg.get('Type') == 'StartProxy':
-                    return msg['Payload']['Url']
-            except json.JSONDecodeError:
-                logger.error("消息解析失败")
+                while self.running:
+                    data = await src.read(self.client.config.bufsize)
+                    if not data:
+                        logger.debug(f"{label} 连接正常关闭")
+                        break
+                    if dst_is_udp:
+                        self.udp_transport.sendto(data, self.remote_addr)
+                    else:
+                        self.proxy_writer.write(data)
+                        await self.proxy_writer.drain()
+                    logger.debug(f"{label} 转发 {len(data)} bytes")
+            except Exception as e:
+                if self.running:
+                    logger.error(f"{label} 转发错误: {str(e)}")
 
-        return ''
+        tcp_task = asyncio.create_task(transfer(self.proxy_reader, True, "服务端 TCP->本地 UDP"))
+        udp_task = asyncio.create_task(transfer(self.local_reader, False, "本地 UDP ->服务端 TCP"))
 
-    async def _bridge_data(self):
+        done, pending = await asyncio.wait({udp_task, tcp_task}, return_when=asyncio.FIRST_COMPLETED)
+
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _bridge_data_tcp(self):
         """双向数据转发"""
         async def forward(src: asyncio.StreamReader, dst: asyncio.StreamWriter, label: str):
             try:
@@ -194,8 +279,8 @@ class ProxyConnection:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
         await asyncio.gather(
-            forward(self.local_reader, self.proxy_writer, "本地->服务端"),
-            forward(self.proxy_reader, self.local_writer, "服务端->本地")
+            forward(self.local_reader, self.proxy_writer, "本地 TCP ->服务端 TCP"),
+            forward(self.proxy_reader, self.local_writer, "服务端 TCP->本地 TCP")
         )
 
     async def _send_packet(self, data: dict):
@@ -221,6 +306,12 @@ class ProxyConnection:
                     await writer.wait_closed()
                 except Exception as e:
                     logger.debug(f"资源清理时发生错误: {str(e)}")
+
+        if self.udp_transport:
+            try:
+                self.udp_transport.close()
+            except Exception as e:
+                logger.debug(f"关闭 UDP 传输时发生错误: {str(e)}")
 
         if self in self.client.proxy_connections:
             self.client.proxy_connections.remove(self)

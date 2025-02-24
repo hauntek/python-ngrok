@@ -7,6 +7,8 @@
 
 [`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) 采用多线程全同步处理，并发性能相当强悍！
 
+[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py) 通过`gevent`替换为多协程全异步处理！
+
 [`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) 采用多协程全异步处理，并发性能异常强悍！
 
 # 运行环境

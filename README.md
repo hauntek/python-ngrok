@@ -14,6 +14,8 @@
 # 运行环境
 [`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) Python 2.7.9 或 Python 3.4.2 以上
 
+[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py) Python 2.7.9 或 Python 3.4.2 以上
+
 [`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) Python 3.10.0 以上
 
 # 运行方法

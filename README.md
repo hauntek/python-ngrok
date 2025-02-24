@@ -57,7 +57,7 @@
 
 1.本地数据分块转发
 
-2.支持单线程异步协程[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
+2.支持多协程全异步处理[`python-ngrok_gevent.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_gevent.py)
 - 需安装gevent库, 命令: `python -m pip install gevent`
 
 ***

@@ -118,8 +118,6 @@ class ProxyConnection:
             # 启动双向数据桥接
             await self._bridge_data()
 
-        except asyncio.TimeoutError:
-            logger.error("等待StartProxy消息超时")
         except Exception as e:
             logger.error(f"代理连接失败: {str(e)}")
         finally:

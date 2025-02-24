@@ -5,9 +5,9 @@
 
 基本上已经完善！并且24*7小时长时间工作，在期间我们多次尝试断网重连、渠道反复注册等，均无任何问题。
 
-[`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) 采用多线程异步处理，并发性能相当强悍！
+[`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) 采用多线程全同步处理，并发性能相当强悍！
 
-[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) 采用协程全异步处理，并发性能异常强悍！
+[`python-ngrok_deepseek.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok_deepseek.py) 采用多协程全异步处理，并发性能异常强悍！
 
 # 运行环境
 [`python-ngrok.py`](https://github.com/hauntek/python-ngrok/blob/master/python-ngrok.py) Python 2.7.9 或 Python 3.4.2 以上

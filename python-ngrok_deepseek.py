@@ -253,8 +253,8 @@ class ProxyConnection:
                 if self.running:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
-        tcp_task = asyncio.create_task(transfer(self.proxy_reader, True, "服务端 TCP->本地 UDP"))
-        udp_task = asyncio.create_task(transfer(self.local_reader, False, "本地 UDP ->服务端 TCP"))
+        tcp_task = asyncio.create_task(transfer(self.proxy_reader, True, "服务端 TCP -> 本地 UDP"))
+        udp_task = asyncio.create_task(transfer(self.local_reader, False, "本地 UDP -> 服务端 TCP"))
 
         done, pending = await asyncio.wait({udp_task, tcp_task}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -279,8 +279,8 @@ class ProxyConnection:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
         await asyncio.gather(
-            forward(self.local_reader, self.proxy_writer, "本地 TCP ->服务端 TCP"),
-            forward(self.proxy_reader, self.local_writer, "服务端 TCP->本地 TCP")
+            forward(self.local_reader, self.proxy_writer, "本地 TCP -> 服务端 TCP"),
+            forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP")
         )
 
     async def _send_packet(self, data: dict):

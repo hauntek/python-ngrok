@@ -323,6 +323,9 @@ class NgrokClient:
         self.config = config
         self.client_id = ''
         self.last_ping = 0.0
+        self.current_retry_interval = 1
+        self.max_retry_interval = 60
+        self.main_loop_task = None
         self.main_reader: asyncio.StreamReader | None = None
         self.main_writer: asyncio.StreamWriter | None = None
         self.ssl_ctx = self._create_ssl_context()
@@ -389,16 +392,6 @@ class NgrokClient:
         except Exception as e:
             logger.error(f"发送数据包失败: {str(e)}")
             raise
-
-    def _safe_close(self):
-        """安全关闭连接"""
-        if self.main_writer:
-            try:
-                self.main_writer.close()
-            except Exception as e:
-                logger.debug(f"关闭连接时发生错误: {str(e)}")
-            finally:
-                self.main_writer = None
 
     async def _handle_req_tunnel(self):
         """请求建立隧道"""
@@ -474,7 +467,34 @@ class NgrokClient:
             logger.error(f"接收数据时发生错误: {str(e)}")
         finally:
             self.running = False
-            self._safe_close()
+
+    async def _wait_for_reconnect(self):
+        """等待重连前的清理"""
+        if self.main_loop_task:
+            try:
+                self.main_loop_task.cancel()
+                await self.main_loop_task
+            except asyncio.CancelledError:
+                logger.debug("主循环任务已正常取消")
+
+    async def _cleanup_resources(self):
+        """增强的资源清理方法"""
+        # 关闭主连接
+        if self.main_writer:
+            self.main_writer.close()
+            try:
+                await self.main_writer.wait_closed()
+            except Exception as e:
+                logger.debug(f"关闭连接时发生错误: {str(e)}")
+            self.main_writer = None
+
+        # 关闭所有代理连接
+        async with self.lock:
+            for conn in self.proxy_connections.copy():
+                try:
+                    await conn._cleanup()
+                except Exception as e:
+                    logger.debug(f"清理代理连接时出错: {str(e)}")
 
     async def _heartbeat_task(self):
         """心跳任务"""
@@ -488,23 +508,54 @@ class NgrokClient:
                     self.running = False
             await asyncio.sleep(1)
 
+    async def _main_loop(self):
+        """主业务逻辑循环"""
+        self.running = True
+        self.main_loop_task = asyncio.gather(
+            self._recv_loop(),
+            self._heartbeat_task()
+        )
+        try:
+            # 启动接收和心跳任务
+            await self.main_loop_task
+        except asyncio.CancelledError:
+            logger.debug("主循环任务被取消")
+            raise
+
+    async def _connect_with_retry(self):
+        """带指数退避的连接方法"""
+        while True:
+            try:
+                await self._connect_server()
+                await self._handle_auth()
+                self.current_retry_interval = 1
+                return
+            except Exception as e:
+                logger.error(f"连接失败，{self.current_retry_interval}秒后重试...")
+                try:
+                    # 等待重连间隔
+                    await asyncio.sleep(self.current_retry_interval)
+                except asyncio.CancelledError:
+                    logger.debug("重连等待被中断")
+                    raise
+                self.current_retry_interval = min(
+                    self.current_retry_interval * 2,
+                    self.max_retry_interval
+                )
+
     async def start(self):
         """启动客户端主循环"""
-        try:
-            await self._connect_server()
-            await self._handle_auth()
-            
-            # 启动接收和心跳任务
-            await asyncio.gather(
-                self._recv_loop(),
-                self._heartbeat_task()
-            )
+        while True:
+            try:
+                await self._connect_with_retry()
+                await self._main_loop()
+            except Exception as e:
+                logger.error(f"运行时异常: {str(e)}")
+            finally:
+                await self._cleanup_resources()
+                await self._wait_for_reconnect()
 
-        except Exception as e:
-            logger.error(f"客户端启动失败: {str(e)}")
-        finally:
-            self._safe_close()
-            logger.info("客户端已停止")
+        logger.info("客户端已停止")
 
 if __name__ == '__main__':
     try:

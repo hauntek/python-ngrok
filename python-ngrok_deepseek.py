@@ -249,6 +249,8 @@ class ProxyConnection:
                         self.proxy_writer.write(data)
                         await self.proxy_writer.drain()
                     logger.debug(f"{label} 转发 {len(data)} bytes")
+            except asyncio.CancelledError:
+                pass
             except Exception as e:
                 if self.running:
                     logger.error(f"{label} 转发错误: {str(e)}")

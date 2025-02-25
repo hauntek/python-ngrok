@@ -509,7 +509,7 @@ class NgrokClient:
             await asyncio.sleep(1)
 
     async def _main_loop(self):
-        """主业务逻辑循环"""
+        """业务逻辑主循环"""
         self.running = True
         self.main_loop_task = asyncio.gather(
             self._recv_loop(),

@@ -187,22 +187,16 @@ class ProxyConnection:
         return ''
 
     async def _connect_local_service_udp(self):
-        class LocalProtocol:
+        class LocalProtocol(asyncio.DatagramProtocol):
             def __init__(self, proxy_conn: ProxyConnection):
                 self.proxy_conn = proxy_conn
                 self.local_queue = asyncio.Queue()
-
-            def connection_made(self, transport: asyncio.DatagramTransport):
-                pass
 
             def datagram_received(self, data: bytes, addr: tuple[str, int]):
                 self.local_queue.put_nowait(data)
 
             def error_received(self, exc: OSError):
                 logger.error(f"UDP 错误: {exc}")
-
-            def connection_lost(self, exc: Exception | None):
-                pass
 
         """连接到本地UDP服务"""
         local_host, local_port = self.client.tunnel_map[self.url]

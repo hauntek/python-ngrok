@@ -528,13 +528,16 @@ class NgrokClient:
                 logger.debug(f"关闭连接时发生错误: {str(e)}")
             self.main_writer = None
 
-        # 关闭所有代理连接
+        # 关闭所有代理连接任务
         async with self.lock:
             for conn in self.proxy_connections.copy():
                 try:
-                    await conn._cleanup()
+                    # 取消所有代理连接创建的任务
+                    for task in conn.tasks:
+                        task.cancel()
+                    await asyncio.gather(*conn.tasks, return_exceptions=True)
                 except Exception as e:
-                    logger.debug(f"清理代理连接时出错: {str(e)}")
+                    logger.debug(f"清理代理连接任务时出错: {str(e)}")
 
         self.req_map.clear()
         self.tunnel_map.clear()

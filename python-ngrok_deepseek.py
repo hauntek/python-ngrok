@@ -235,7 +235,8 @@ class ProxyConnection:
         async def tcp_to_udp(src: asyncio.StreamReader, label: str):
             try:
                 buffer = b''
-                while data := await src.read(self.client.config.bufsize):
+                while self.running:
+                    data = await src.read(self.client.config.bufsize):
                     if not data:
                         logger.debug(f"{label} 连接正常关闭")
                         break
@@ -257,7 +258,8 @@ class ProxyConnection:
 
         async def udp_to_tcp(src: asyncio.StreamReader, label: str):
             try:
-                while data := await src.read(self.client.config.bufsize):
+                while self.running:
+                    data = await src.read(self.client.config.bufsize):
                     if not data:
                         logger.debug(f"{label} 连接正常关闭")
                         break

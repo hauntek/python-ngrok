@@ -341,8 +341,8 @@ class ProxyConnection:
         writers = [self.proxy_writer, self.local_writer]
         for writer in writers:
             if writer and not writer.is_closing():
-                writer.close()
                 try:
+                    writer.close()
                     await writer.wait_closed()
                 except Exception as e:
                     logger.debug(f"关闭 writer 时发生错误: {str(e)}")
@@ -541,6 +541,10 @@ class NgrokClient:
                     await conn._cleanup()
                 except Exception as e:
                     logger.debug(f"清理代理连接时出错: {str(e)}")
+
+        self.req_map.clear()
+        self.tunnel_map.clear()
+        self.proxy_connections.clear()
 
     async def _heartbeat_task(self):
         """心跳任务"""

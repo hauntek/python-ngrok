@@ -279,8 +279,8 @@ class ProxyConnection:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
         await asyncio.gather(
-            forward(self.local_reader, self.proxy_writer, "本地 TCP -> 服务端 TCP"),
-            forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP")
+            forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP"),
+            forward(self.local_reader, self.proxy_writer, "本地 TCP -> 服务端 TCP")
         )
 
     async def _send_packet(self, data: dict):

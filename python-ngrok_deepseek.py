@@ -169,15 +169,17 @@ class ProxyConnection:
     async def _message_loop_until_startproxy(self):
         """持续接收消息，直到收到StartProxy"""
         while True:
-            header = await asyncio.wait_for(self.proxy_reader.read(8), timeout=60)
-            if not header:
-                break
             try:
+                header = await asyncio.wait_for(self.proxy_reader.read(8), timeout=60)
+                if not header:
+                    break
                 msg_len, _ = struct.unpack('<II', header)
                 msg = json.loads(await asyncio.wait_for(self.proxy_reader.read(msg_len), timeout=60))
                 logger.debug(f"收到消息: {msg}")
                 if msg.get('Type') == 'StartProxy':
                     return msg['Payload']['Url']
+            except (ConnectionResetError, BrokenPipeError):
+                break
             except asyncio.TimeoutError:
                 break
             except json.JSONDecodeError:

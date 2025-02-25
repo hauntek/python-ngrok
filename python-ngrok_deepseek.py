@@ -107,6 +107,7 @@ class ProxyConnection:
         self.local_writer: asyncio.StreamWriter | None = None
         self.udp_transport: asyncio.DatagramTransport | None = None
         self.local_queue: asyncio.Queue | None = None
+        self.tasks = []
         self.running = True
 
     async def start(self):
@@ -276,6 +277,7 @@ class ProxyConnection:
 
         tcp_task = asyncio.create_task(tcp_to_udp(self.proxy_reader, "服务端 TCP -> 本地 UDP"))
         udp_task = asyncio.create_task(udp_to_tcp(self.local_queue, "本地 UDP -> 服务端 TCP"))
+        self.tasks.extend([tcp_task, udp_task])
 
         done, pending = await asyncio.wait({udp_task, tcp_task}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -295,14 +297,25 @@ class ProxyConnection:
                     dst.write(data)
                     await dst.drain()
                     logger.debug(f"{label} 转发 {len(data)} bytes")
+            except asyncio.CancelledError:
+                pass
             except Exception as e:
                 if self.running:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
-        await asyncio.gather(
-            forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP"),
+        task1 = asyncio.create_task(
+            forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP")
+        )
+        task2 = asyncio.create_task(
             forward(self.local_reader, self.proxy_writer, "本地 TCP -> 服务端 TCP")
         )
+        self.tasks.extend([task1, task2])
+
+        done, pending = await asyncio.wait({task1, task2}, return_when=asyncio.FIRST_COMPLETED)
+
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
 
     async def _send_packet(self, data: dict):
         """发送协议数据包"""
@@ -320,13 +333,19 @@ class ProxyConnection:
         """资源清理"""
         self.running = False
 
-        for writer in [self.proxy_writer, self.local_writer]:
-            if writer:
+        # 取消本连接创建的所有任务
+        for task in self.tasks:
+            task.cancel()
+        await asyncio.gather(*self.tasks, return_exceptions=True)
+
+        writers = [self.proxy_writer, self.local_writer]
+        for writer in writers:
+            if writer and not writer.is_closing():
+                writer.close()
                 try:
-                    writer.close()
                     await writer.wait_closed()
                 except Exception as e:
-                    logger.debug(f"资源清理时发生错误: {str(e)}")
+                    logger.debug(f"关闭 writer 时发生错误: {str(e)}")
 
         if self.udp_transport:
             try:
@@ -334,8 +353,13 @@ class ProxyConnection:
             except Exception as e:
                 logger.debug(f"关闭 UDP 传输时发生错误: {str(e)}")
 
-        if self in self.client.proxy_connections:
-            self.client.proxy_connections.remove(self)
+        if self.local_queue is not None:
+            self.local_queue.put_nowait(None)
+
+        # 从客户端移除本连接
+        async with self.client.lock:
+            if self in self.client.proxy_connections:
+                self.client.proxy_connections.remove(self)
 
 class NgrokClient:
     def __init__(self, config: NgrokConfig):

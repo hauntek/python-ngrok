@@ -205,29 +205,29 @@ class ProxyConnection:
                 pass
 
         """连接到本地UDP服务"""
-        lhost, lport = self.client.tunnel_map[self.url]
+        local_host, local_port = self.client.tunnel_map[self.url]
         try:
             loop = asyncio.get_running_loop()
             transport, protocol = await loop.create_datagram_endpoint(
                 lambda: LocalProtocol(self),
-                remote_addr=(lhost, lport)
+                remote_addr=(local_host, local_port)
             )
             self.udp_transport = transport
             self.local_queue = protocol.local_queue
-            logger.info(f"已连接到本地 UDP 服务 {lhost}:{lport}")
+            logger.info(f"已连接到本地 UDP 服务 {local_host}:{local_port}")
         except Exception as e:
             logger.error(f"本地 UDP 服务连接失败: {str(e)}")
             raise
 
     async def _connect_local_service_tcp(self):
         """连接到本地TCP服务"""
-        lhost, lport = self.client.tunnel_map[self.url]
+        local_host, local_port = self.client.tunnel_map[self.url]
         try:
             self.local_reader, self.local_writer = await asyncio.open_connection(
-                host=lhost,
-                port=lport
+                host=local_host,
+                port=local_port
             )
-            logger.info(f"已连接到本地 TCP 服务 {lhost}:{lport}")
+            logger.info(f"已连接到本地 TCP 服务 {local_host}:{local_port}")
         except Exception as e:
             logger.error(f"本地 TCP 服务连接失败: {str(e)}")
             raise
@@ -262,8 +262,8 @@ class ProxyConnection:
             try:
                 while self.running:
                     data = await src.get()
-                    if not data:
-                        logger.debug(f"{label} 连接正常关闭")
+                    if data is None:
+                        logger.debug(f"{label} 收到终止信号")
                         break
                     header = struct.pack('<LL', len(data), 0)
                     self.proxy_writer.write(header + data)
@@ -354,7 +354,10 @@ class ProxyConnection:
                 logger.debug(f"关闭 UDP 传输时发生错误: {str(e)}")
 
         if self.local_queue is not None:
-            self.local_queue.put_nowait(None)
+            try:
+                self.local_queue.put_nowait(None)
+            except asyncio.QueueFull:
+                await self.local_queue.put(None)
 
         # 从客户端移除本连接
         async with self.client.lock:

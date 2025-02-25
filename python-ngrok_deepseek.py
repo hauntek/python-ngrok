@@ -106,7 +106,6 @@ class ProxyConnection:
         self.local_reader: asyncio.StreamReader | None = None
         self.local_writer: asyncio.StreamWriter | None = None
         self.udp_transport: asyncio.DatagramTransport | None = None
-        self.remote_addr = None
         self.running = True
 
     async def start(self):
@@ -190,19 +189,17 @@ class ProxyConnection:
             def __init__(self, proxy_conn: 'ProxyConnection'):
                 self.proxy_conn = proxy_conn
                 self.local_reader = asyncio.StreamReader()
-                self.remote_addr = None
 
-            def connection_made(self, transport):
+            def connection_made(self, transport: asyncio.DatagramTransport):
                 pass
 
-            def datagram_received(self, data, addr):
-                self.remote_addr = addr
+            def datagram_received(self, data: bytes, addr: tuple[str, int]):
                 self.local_reader.feed_data(data)
 
-            def error_received(self, exc):
+            def error_received(self, exc: OSError):
                 logger.error(f"UDP 错误: {exc}")
 
-            def connection_lost(self, exc):
+            def connection_lost(self, exc: Exception | None):
                 pass
 
         """连接到本地UDP服务"""
@@ -215,7 +212,6 @@ class ProxyConnection:
             )
             self.udp_transport = transport
             self.local_reader = protocol.local_reader
-            self.remote_addr = protocol.remote_addr
             logger.info(f"已连接到本地 UDP 服务 {lhost}:{lport}")
         except Exception as e:
             logger.error(f"本地 UDP 服务连接失败: {str(e)}")
@@ -236,18 +232,38 @@ class ProxyConnection:
 
     async def _bridge_data_udp(self):
         """双向数据转发"""
-        async def transfer(src, dst_is_udp: bool, label):
+        async def tcp_to_udp(src: asyncio.StreamReader, label: str):
             try:
-                while self.running:
-                    data = await src.read(self.client.config.bufsize)
+                buffer = b''
+                while data := await src.read(self.client.config.bufsize):
                     if not data:
                         logger.debug(f"{label} 连接正常关闭")
                         break
-                    if dst_is_udp:
-                        self.udp_transport.sendto(data, self.remote_addr)
-                    else:
-                        self.proxy_writer.write(data)
-                        await self.proxy_writer.drain()
+                    buffer += data
+                    while len(buffer) >= 8:
+                        pkt_len, _ = struct.unpack('<II', buffer[:8])
+                        if len(buffer) < 8 + pkt_len:
+                            break
+                        udp_data = buffer[8:8+pkt_len]
+                        if self.udp_transport:
+                            self.udp_transport.sendto(udp_data, None)
+                            logger.debug(f"{label} 转发 {len(udp_data)} bytes")
+                        buffer = buffer[8+pkt_len:]
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                if self.running:
+                    logger.error(f"{label} 转发错误: {str(e)}")
+
+        async def udp_to_tcp(src: asyncio.StreamReader, label: str):
+            try:
+                while data := await src.read(self.client.config.bufsize):
+                    if not data:
+                        logger.debug(f"{label} 连接正常关闭")
+                        break
+                    header = struct.pack('<LL', len(data), 0)
+                    self.proxy_writer.write(header + data)
+                    await self.proxy_writer.drain()
                     logger.debug(f"{label} 转发 {len(data)} bytes")
             except asyncio.CancelledError:
                 pass
@@ -255,8 +271,8 @@ class ProxyConnection:
                 if self.running:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
-        tcp_task = asyncio.create_task(transfer(self.proxy_reader, True, "服务端 TCP -> 本地 UDP"))
-        udp_task = asyncio.create_task(transfer(self.local_reader, False, "本地 UDP -> 服务端 TCP"))
+        tcp_task = asyncio.create_task(tcp_to_udp(self.proxy_reader, "服务端 TCP -> 本地 UDP"))
+        udp_task = asyncio.create_task(udp_to_tcp(self.local_reader, "本地 UDP -> 服务端 TCP"))
 
         done, pending = await asyncio.wait({udp_task, tcp_task}, return_when=asyncio.FIRST_COMPLETED)
 

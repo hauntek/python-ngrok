@@ -186,7 +186,7 @@ class ProxyConnection:
 
     async def _connect_local_service_udp(self):
         class LocalProtocol:
-            def __init__(self, proxy_conn: 'ProxyConnection'):
+            def __init__(self, proxy_conn: ProxyConnection):
                 self.proxy_conn = proxy_conn
                 self.local_reader = asyncio.StreamReader()
 
@@ -236,7 +236,7 @@ class ProxyConnection:
             try:
                 buffer = b''
                 while self.running:
-                    data = await src.read(self.client.config.bufsize):
+                    data = await src.read(self.client.config.bufsize)
                     if not data:
                         logger.debug(f"{label} 连接正常关闭")
                         break
@@ -259,7 +259,7 @@ class ProxyConnection:
         async def udp_to_tcp(src: asyncio.StreamReader, label: str):
             try:
                 while self.running:
-                    data = await src.read(self.client.config.bufsize):
+                    data = await src.read(self.client.config.bufsize)
                     if not data:
                         logger.debug(f"{label} 连接正常关闭")
                         break

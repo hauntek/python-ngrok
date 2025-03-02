@@ -3,15 +3,15 @@
 # 建议Python 3.10.0 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
 # Version: 2.1.0
+import asyncio
 import socket
 import ssl
 import json
 import struct
-import random
 import sys
 import time
+import secrets
 import logging
-import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -436,7 +436,7 @@ class NgrokClient:
     async def _handle_req_tunnel(self):
         """请求建立隧道"""
         for tunnel in self.config.tunnels:
-            req_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz', k=8))
+            req_id = secrets.token_hex(8)
             self.req_map[req_id] = (tunnel['lhost'], tunnel['lport'])
             
             req_msg = {

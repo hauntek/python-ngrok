@@ -548,7 +548,7 @@ class NgrokClient:
         while self.running:
             if time.time() - self.last_ping > 20:
                 try:
-                    await self._send_packet({'Type': 'Ping'})
+                    await self._send_packet({'Type': 'Ping', 'Payload': {}})
                     self.last_ping = time.time()
                 except Exception as e:
                     logger.error(f"发送心跳失败: {str(e)}")

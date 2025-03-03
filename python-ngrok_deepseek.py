@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 # 建议Python 3.7.0 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok

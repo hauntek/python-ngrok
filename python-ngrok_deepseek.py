@@ -12,7 +12,7 @@ import sys
 import time
 import secrets
 import logging
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, Dict, List
 from dataclasses import dataclass, asdict, fields
 
 # 配置日志格式

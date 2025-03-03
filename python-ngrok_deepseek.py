@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# 建议Python 3.10.0 以上运行
+# 建议Python 3.7.0 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
 # Version: 2.2.0
 import asyncio
@@ -12,6 +12,7 @@ import sys
 import time
 import secrets
 import logging
+from typing import Optional, List, Dict
 from dataclasses import dataclass, asdict, fields
 
 logging.basicConfig(
@@ -108,7 +109,7 @@ class NgrokConfig:
         self.server_port = 4443
         self.bufsize = 1024
         self.authtoken = ''
-        self.tunnels: list[dict] = []
+        self.tunnels: List[Dict] = []
 
         body = dict()
         body['protocol'] = 'http'
@@ -183,12 +184,12 @@ class ProxyConnection:
     def __init__(self, client: 'NgrokClient'):
         self.client = client
         self.url = None
-        self.proxy_reader: asyncio.StreamReader | None = None
-        self.proxy_writer: asyncio.StreamWriter | None = None
-        self.local_reader: asyncio.StreamReader | None = None
-        self.local_writer: asyncio.StreamWriter | None = None
-        self.udp_transport: asyncio.DatagramTransport | None = None
-        self.local_queue: asyncio.Queue | None = None
+        self.proxy_reader: Optional[asyncio.StreamReader]
+        self.proxy_writer: Optional[asyncio.StreamWriter]
+        self.local_reader: Optional[asyncio.StreamReader]
+        self.local_writer: Optional[asyncio.StreamWriter]
+        self.udp_transport: Optional[asyncio.DatagramTransport]
+        self.local_queue: Optional[asyncio.Queue]
         self.tasks = []
         self.running = True
 
@@ -423,8 +424,8 @@ class NgrokClient:
         self.current_retry_interval = 1
         self.max_retry_interval = 60
         self.main_loop_task = None
-        self.main_reader: asyncio.StreamReader | None = None
-        self.main_writer: asyncio.StreamWriter | None = None
+        self.main_reader: Optional[asyncio.StreamReader]
+        self.main_writer: Optional[asyncio.StreamWriter]
         self.ssl_ctx = self._create_ssl_context()
         self.req_map: dict[str, tuple[str, int]] = {}
         self.tunnel_map: dict[str, tuple[str, int]] = {}

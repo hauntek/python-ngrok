@@ -15,6 +15,7 @@ import logging
 from typing import Optional, List, Dict
 from dataclasses import dataclass, asdict, fields
 
+# 配置日志格式
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
@@ -22,134 +23,134 @@ logging.basicConfig(
 )
 logger = logging.getLogger('NgrokClient')
 
+# 定义认证消息的数据结构
 @dataclass
 class Auth:
-    Version: str = "2"
-    MmVersion: str = "1.7"
-    User: str = ""
-    Password: str = ""
-    OS: str = "darwin"
-    Arch: str = "amd64"
-    ClientId: str = ""
+    Version: str = "2"  # 协议版本
+    MmVersion: str = "1.7"  # 主版本号
+    User: str = ""  # 用户名
+    Password: str = ""  # 密码
+    OS: str = "darwin"  # 操作系统
+    Arch: str = "amd64"  # 系统架构
+    ClientId: str = ""  # 客户端ID
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义认证响应消息的数据结构
 @dataclass
 class AuthResp:
-    Version: str = "2"
-    MmVersion: str = "1.7"
-    ClientId : str = ""
-    Error: str = ""
+    Version: str = "2"  # 协议版本
+    MmVersion: str = "1.7"  # 主版本号
+    ClientId: str = ""  # 客户端ID
+    Error: str = ""  # 错误信息
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义请求隧道消息的数据结构
 @dataclass
 class ReqTunnel:
-    ReqId: str = ""
-    Protocol: str = ""
-    Hostname: str = ""
-    Subdomain: str = ""
-    HttpAuth: str = ""
-    RemotePort: int = 0
+    ReqId: str = ""  # 请求ID
+    Protocol: str = ""  # 协议类型（如 http、tcp）
+    Hostname: str = ""  # 主机名
+    Subdomain: str = ""  # 子域名
+    HttpAuth: str = ""  # HTTP 认证信息
+    RemotePort: int = 0  # 远程端口
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义新隧道消息的数据结构
 @dataclass
 class NewTunnel:
-    ReqId: str = ""
-    Url: str = ""
-    Protocol: str = ""
-    Error: str = ""
+    ReqId: str = ""  # 请求ID
+    Url: str = ""  # 隧道URL
+    Protocol: str = ""  # 协议类型
+    Error: str = ""  # 错误信息
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义请求代理消息的数据结构
 @dataclass
 class ReqProxy:
     pass
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义注册代理消息的数据结构
 @dataclass
 class RegProxy:
-    ClientId: str = ""
+    ClientId: str = ""  # 客户端ID
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义启动代理消息的数据结构
 @dataclass
 class StartProxy:
-    Url: str = ""
-    ClientAddr: str = ""
+    Url: str = ""  # 代理URL
+    ClientAddr: str = ""  # 客户端地址
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义心跳消息的数据结构
 @dataclass
 class Ping:
     pass
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# 定义心跳响应消息的数据结构
 @dataclass
 class Pong:
     pass
+
     @classmethod
     def get_class_name(cls):
+        """返回类名"""
         return cls.__name__
 
+# Ngrok 客户端配置类
 class NgrokConfig:
     def __init__(self):
-        self.server_host = 'tunnel.qydev.com'
-        self.server_port = 4443
-        self.bufsize = 1024
-        self.authtoken = ''
-        self.tunnels: List[Dict] = []
+        """初始化默认配置"""
+        self.server_host = 'tunnel.qydev.com'  # 服务器主机名
+        self.server_port = 4443  # 服务器端口
+        self.bufsize = 1024  # 缓冲区大小
+        self.authtoken = ''  # 认证令牌
+        self.tunnels: List[Dict] = []  # 隧道配置列表
 
-        body = dict()
-        body['protocol'] = 'http'
-        body['hostname'] = 'www.xxx.com'
-        body['subdomain'] = ''
-        body['httpauth'] = ''
-        body['rport'] = 0
-        body['lhost'] = '127.0.0.1'
-        body['lport'] = 80
-        self.tunnels.append(body) # 加入渠道队列
-
-        body = dict()
-        body['protocol'] = 'http'
-        body['hostname'] = ''
-        body['subdomain'] = 'xxx'
-        body['httpauth'] = ''
-        body['rport'] = 0
-        body['lhost'] = '127.0.0.1'
-        body['lport'] = 80
-        self.tunnels.append(body) # 加入渠道队列
-
-        body = dict()
-        body['protocol'] = 'tcp'
-        body['hostname'] = ''
-        body['subdomain'] = ''
-        body['httpauth'] = ''
-        body['rport'] = 55499
-        body['lhost'] = '127.0.0.1'
-        body['lport'] = 22
-        self.tunnels.append(body) # 加入渠道队列
-
-        body = dict()
-        body['protocol'] = 'udp'
-        body['hostname'] = ''
-        body['subdomain'] = ''
-        body['httpauth'] = ''
-        body['rport'] = 55499
-        body['lhost'] = '127.0.0.1'
-        body['lport'] = 53
-        self.tunnels.append(body) # 加入渠道队列
+        # 添加默认隧道配置
+        self.tunnels.append({
+            'protocol': 'http',
+            'hostname': 'www.xxx.com',
+            'subdomain': '',
+            'httpauth': '',
+            'rport': 0,
+            'lhost': '127.0.0.1',
+            'lport': 80
+        })
 
     @classmethod
     def from_file(cls, filename: str) -> 'NgrokConfig':
@@ -179,17 +180,18 @@ class NgrokConfig:
             raise
         return config
 
+# 代理连接处理器
 class ProxyConnection:
-    """代理连接处理器"""
     def __init__(self, client: 'NgrokClient'):
+        """初始化代理连接"""
         self.client = client
         self.url = None
-        self.proxy_reader: Optional[asyncio.StreamReader]
-        self.proxy_writer: Optional[asyncio.StreamWriter]
-        self.local_reader: Optional[asyncio.StreamReader]
-        self.local_writer: Optional[asyncio.StreamWriter]
-        self.udp_transport: Optional[asyncio.DatagramTransport]
-        self.local_queue: Optional[asyncio.Queue]
+        self.proxy_reader: Optional[asyncio.StreamReader] = None
+        self.proxy_writer: Optional[asyncio.StreamWriter] = None
+        self.local_reader: Optional[asyncio.StreamReader] = None
+        self.local_writer: Optional[asyncio.StreamWriter] = None
+        self.udp_transport: Optional[asyncio.DatagramTransport] = None
+        self.local_queue: Optional[asyncio.Queue] = None
         self.tasks = []
         self.running = True
 
@@ -198,8 +200,8 @@ class ProxyConnection:
         try:
             # 建立新的代理连接
             await self._connect_proxy_server()
-            
-            # 发送RegProxy注册
+
+            # 发送 RegProxy 注册消息
             try:
                 regproxy_msg = RegProxy(ClientId=self.client.client_id)
                 await self.client._send_packet(self.proxy_writer, regproxy_msg)
@@ -207,17 +209,17 @@ class ProxyConnection:
                 logger.debug(f"发送数据时发生错误: {str(e)}")
                 return
 
-            # 等待StartProxy消息
+            # 等待 StartProxy 消息
             try:
                 msg = await self.client._recv_packet(self.proxy_reader)
                 if not msg:
                     return
                 if not isinstance(msg, StartProxy):
-                    logger.debug("未收到StartProxy消息")
+                    logger.debug("未收到 StartProxy 消息")
                     return
 
                 if not msg.Url:
-                    logger.debug("未收到有效URL")
+                    logger.debug("未收到有效 URL")
                     return
                 self.url = msg.Url
             except Exception as e:
@@ -226,13 +228,13 @@ class ProxyConnection:
 
             protocol = self.url.split(":")[0]
             if protocol == 'udp':
-                # 连接到本地服务
+                # 连接到本地 UDP 服务
                 await self._connect_local_service_udp()
                 # 启动双向数据桥接
                 await self._bridge_data_udp()
                 return
 
-            # 连接到本地服务
+            # 连接到本地 TCP 服务
             await self._connect_local_service_tcp()
             # 启动双向数据桥接
             await self._bridge_data_tcp()
@@ -257,18 +259,20 @@ class ProxyConnection:
             raise
 
     async def _connect_local_service_udp(self):
+        """连接到本地 UDP 服务"""
         class LocalProtocol(asyncio.DatagramProtocol):
-            def __init__(self, proxy_conn: ProxyConnection):
+            def __init__(self, proxy_conn: 'ProxyConnection'):
                 self.proxy_conn = proxy_conn
                 self.local_queue = asyncio.Queue()
 
             def datagram_received(self, data: bytes, addr: tuple[str, int]):
+                """接收 UDP 数据"""
                 self.local_queue.put_nowait(data)
 
             def error_received(self, exc: OSError):
+                """处理 UDP 错误"""
                 logger.error(f"UDP 错误: {exc}")
 
-        """连接到本地UDP服务"""
         local_host, local_port = self.client.tunnel_map[self.url]
         try:
             loop = asyncio.get_running_loop()
@@ -284,7 +288,7 @@ class ProxyConnection:
             raise
 
     async def _connect_local_service_tcp(self):
-        """连接到本地TCP服务"""
+        """连接到本地 TCP 服务"""
         local_host, local_port = self.client.tunnel_map[self.url]
         try:
             self.local_reader, self.local_writer = await asyncio.open_connection(
@@ -297,8 +301,9 @@ class ProxyConnection:
             raise
 
     async def _bridge_data_udp(self):
-        """双向数据转发"""
+        """双向数据转发（UDP）"""
         async def tcp_to_udp(src: asyncio.StreamReader, label: str):
+            """从 TCP 读取数据并转发到 UDP"""
             try:
                 buffer = b''
                 while self.running:
@@ -323,6 +328,7 @@ class ProxyConnection:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
         async def udp_to_tcp(src: asyncio.Queue, label: str):
+            """从 UDP 读取数据并转发到 TCP"""
             try:
                 while self.running:
                     data = await src.get()
@@ -350,8 +356,9 @@ class ProxyConnection:
         await asyncio.gather(*pending, return_exceptions=True)
 
     async def _bridge_data_tcp(self):
-        """双向数据转发"""
+        """双向数据转发（TCP）"""
         async def forward(src: asyncio.StreamReader, dst: asyncio.StreamWriter, label: str):
+            """从源读取数据并转发到目标"""
             try:
                 while self.running:
                     data = await src.read(self.client.config.bufsize)
@@ -416,26 +423,28 @@ class ProxyConnection:
             if self in self.client.proxy_connections:
                 self.client.proxy_connections.remove(self)
 
+# Ngrok 客户端类
 class NgrokClient:
     def __init__(self, config: NgrokConfig):
+        """初始化 Ngrok 客户端"""
         self.config = config
-        self.client_id = ''
-        self.last_ping = 0.0
-        self.current_retry_interval = 1
-        self.max_retry_interval = 60
-        self.main_loop_task = None
-        self.main_reader: Optional[asyncio.StreamReader]
-        self.main_writer: Optional[asyncio.StreamWriter]
-        self.ssl_ctx = self._create_ssl_context()
-        self.req_map: dict[str, tuple[str, int]] = {}
-        self.tunnel_map: dict[str, tuple[str, int]] = {}
-        self.proxy_connections = []
-        self.lock = asyncio.Lock()
-        self.running = True
-        self._validate_tunnels()
+        self.client_id = ''  # 客户端ID
+        self.last_ping = 0.0  # 上次心跳时间
+        self.current_retry_interval = 1  # 当前重试间隔
+        self.max_retry_interval = 60  # 最大重试间隔
+        self.main_loop_task = None  # 主循环任务
+        self.main_reader: Optional[asyncio.StreamReader] = None  # 主连接读取器
+        self.main_writer: Optional[asyncio.StreamWriter] = None  # 主连接写入器
+        self.ssl_ctx = self._create_ssl_context()  # SSL 上下文
+        self.req_map: dict[str, tuple[str, int]] = {}  # 请求ID到本地地址的映射
+        self.tunnel_map: dict[str, tuple[str, int]] = {}  # 隧道URL到本地地址的映射
+        self.proxy_connections = []  # 代理连接列表
+        self.lock = asyncio.Lock()  # 异步锁
+        self.running = True  # 运行状态
+        self._validate_tunnels()  # 验证隧道配置
 
     def _create_ssl_context(self) -> ssl.SSLContext:
-        """创建SSL上下文"""
+        """创建 SSL 上下文"""
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
@@ -473,7 +482,7 @@ class NgrokClient:
 
     def dict_to_message(self, msg: dict):
         """
-        Converts a dictionary to a message type.
+        将字典转换为消息类型
         """
         msg_type = msg.get("Type")
         payload = msg.get("Payload", {})
@@ -493,7 +502,7 @@ class NgrokClient:
             payload = {k: payload[k] for k in payload if k in {f.name for f in fields(cls)}}
             return cls(**payload)
         else:
-            raise ValueError(f"Unknown message type: {msg_type}")
+            raise ValueError(f"未知消息类型: {msg_type}")
 
     async def _recv_packet(self, reader: asyncio.StreamReader):
         """接收协议数据包"""
@@ -678,6 +687,7 @@ class NgrokClient:
 
 if __name__ == '__main__':
     try:
+        # 从配置文件加载配置，或使用默认配置
         config = NgrokConfig.from_file(sys.argv[1]) if len(sys.argv) > 1 else NgrokConfig()
         client = NgrokClient(config)
         asyncio.run(client.start())

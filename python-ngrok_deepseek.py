@@ -546,7 +546,7 @@ class NgrokClient:
     async def _heartbeat_task(self):
         """心跳任务"""
         while self.running:
-            if time.time() - self.last_ping > 20:
+            if self.last_ping and time.time() - self.last_ping > 20:
                 try:
                     await self._send_packet({'Type': 'Ping', 'Payload': {}})
                     self.last_ping = time.time()

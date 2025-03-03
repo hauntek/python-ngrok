@@ -1,6 +1,6 @@
 # python-ngrok
 ![license](https://img.shields.io/badge/license-GPLV3-blue)
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Python](https://img.shields.io/badge/Python-3.7%2B-blue)
 ![version](https://img.shields.io/badge/Release-v2.2-orange)
 
 基本上已经完善！并且24*7小时长时间工作，在期间我们多次尝试断网重连、渠道反复注册等，均无任何问题。

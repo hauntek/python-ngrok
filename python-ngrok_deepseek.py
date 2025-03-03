@@ -151,6 +151,33 @@ class NgrokConfig:
             'lhost': '127.0.0.1',
             'lport': 80
         })
+        self.tunnels.append({
+            'protocol': 'http',
+            'hostname': '',
+            'subdomain': 'xxx',
+            'httpauth': '',
+            'rport': 0,
+            'lhost': '127.0.0.1',
+            'lport': 80
+        })
+        self.tunnels.append({
+            'protocol': 'tcp',
+            'hostname': '',
+            'subdomain': '',
+            'httpauth': '',
+            'rport': 55499,
+            'lhost': '127.0.0.1',
+            'lport': 22
+        })
+        self.tunnels.append({
+            'protocol': 'udp',
+            'hostname': '',
+            'subdomain': '',
+            'httpauth': '',
+            'rport': 55499,
+            'lhost': '127.0.0.1',
+            'lport': 53
+        })
 
     @classmethod
     def from_file(cls, filename: str) -> 'NgrokConfig':
@@ -261,7 +288,7 @@ class ProxyConnection:
     async def _connect_local_service_udp(self):
         """连接到本地 UDP 服务"""
         class LocalProtocol(asyncio.DatagramProtocol):
-            def __init__(self, proxy_conn: 'ProxyConnection'):
+            def __init__(self, proxy_conn: ProxyConnection):
                 self.proxy_conn = proxy_conn
                 self.local_queue = asyncio.Queue()
 

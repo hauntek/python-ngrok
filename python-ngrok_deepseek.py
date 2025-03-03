@@ -12,7 +12,7 @@ import sys
 import time
 import secrets
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, Union, List, Dict
 from dataclasses import dataclass, asdict, fields
 
 # 配置日志格式
@@ -130,6 +130,9 @@ class Pong:
     def get_class_name(cls):
         """返回类名"""
         return cls.__name__
+
+# 定义消息类型的联合类型
+MessageType = Union[Auth, AuthResp, ReqTunnel, NewTunnel, ReqProxy, RegProxy, StartProxy, Ping, Pong]
 
 # Ngrok 客户端配置类
 class NgrokConfig:
@@ -531,7 +534,7 @@ class NgrokClient:
         else:
             raise ValueError(f"未知消息类型: {msg_type}")
 
-    async def _recv_packet(self, reader: asyncio.StreamReader):
+    async def _recv_packet(self, reader: asyncio.StreamReader) -> Optional[MessageType]:
         """接收协议数据包"""
         header = await reader.read(8)
         if not header:
@@ -543,7 +546,7 @@ class NgrokClient:
         logger.debug(f"收到消息: {msg}")
         return self.dict_to_message(msg)
 
-    async def _send_packet(self, writer: asyncio.StreamWriter, msg):
+    async def _send_packet(self, writer: asyncio.StreamWriter, msg: MessageType):
         """发送协议数据包"""
         data = {"Type": msg.get_class_name(), "Payload": asdict(msg)}
         msg = json.dumps(data).encode('utf-8')
@@ -568,7 +571,7 @@ class NgrokClient:
             )
             await self._send_packet(self.main_writer, req_msg)
 
-    async def _process_message(self, msg):
+    async def _process_message(self, msg: MessageType):
         """处理服务器消息"""
         if isinstance(msg, AuthResp):
             if msg.Error:

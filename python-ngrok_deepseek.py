@@ -410,13 +410,13 @@ class NgrokClient:
         auth_msg = {
             'Type': 'Auth',
             'Payload': {
-                'ClientId': self.client_id,
-                'OS': 'darwin',
-                'Arch': 'amd64',
                 'Version': '2',
                 'MmVersion': '1.7',
                 'User': self.config.authtoken,
-                'Password': ''
+                'Password': '',
+                'OS': 'darwin',
+                'Arch': 'amd64',
+                'ClientId': self.client_id
             }
         }
         await self._send_packet(auth_msg)

@@ -209,11 +209,16 @@ class ProxyConnection:
             # 等待StartProxy消息
             try:
                 msg = await self.client._recv_packet(self.proxy_reader)
-                if isinstance(msg, StartProxy):
-                    if not msg.Url:
-                        logger.debug("未收到有效URL")
-                        return
-                    self.url = msg.Url
+                if not msg:
+                    return
+                if not isinstance(msg, StartProxy):
+                    logger.debug("未收到StartProxy消息")
+                    return
+
+                if not msg.Url:
+                    logger.debug("未收到有效URL")
+                    return
+                self.url = msg.Url
             except Exception as e:
                 logger.debug(f"接收数据时发生错误: {str(e)}")
                 return
@@ -493,7 +498,7 @@ class NgrokClient:
         """接收协议数据包"""
         header = await reader.read(8)
         if not header:
-            logger.warning("Received empty header, connection might be closed.")
+            logger.debug("连接已关闭")
             return
         msg_len, _ = struct.unpack('<II', header)
         data = await reader.read(msg_len)
@@ -560,7 +565,8 @@ class NgrokClient:
             while self.running:
                 msg = await self._recv_packet(self.main_reader)
                 if not msg:
-                    break
+                    self.last_ping = time.time()
+                    await asyncio.sleep(1)
                 await self._process_message(msg)
         except (asyncio.IncompleteReadError, ConnectionError) as e:
             logger.debug(f"连接中断: {str(e)}")

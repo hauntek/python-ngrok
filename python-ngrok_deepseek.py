@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 # 建议Python 3.10.0 以上运行
 # 项目地址: https://github.com/hauntek/python-ngrok
-# Version: 2.1.0
+# Version: 2.2.0
 import asyncio
 import socket
 import ssl
@@ -12,6 +12,7 @@ import sys
 import time
 import secrets
 import logging
+from dataclasses import dataclass, asdict, fields
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,87 @@ logging.basicConfig(
     datefmt='%Y/%m/%d %H:%M:%S'
 )
 logger = logging.getLogger('NgrokClient')
+
+@dataclass
+class Auth:
+    Version: str = "2"
+    MmVersion: str = "1.7"
+    User: str = ""
+    Password: str = ""
+    OS: str = "darwin"
+    Arch: str = "amd64"
+    ClientId: str = ""
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class AuthResp:
+    Version: str = "2"
+    MmVersion: str = "1.7"
+    ClientId : str = ""
+    Error: str = ""
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class ReqTunnel:
+    ReqId: str = ""
+    Protocol: str = ""
+    Hostname: str = ""
+    Subdomain: str = ""
+    HttpAuth: str = ""
+    RemotePort: int = 0
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class NewTunnel:
+    ReqId: str = ""
+    Url: str = ""
+    Protocol: str = ""
+    Error: str = ""
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class ReqProxy:
+    pass
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class RegProxy:
+    ClientId: str = ""
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class StartProxy:
+    Url: str = ""
+    ClientAddr: str = ""
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class Ping:
+    pass
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
+
+@dataclass
+class Pong:
+    pass
+    @classmethod
+    def get_class_name(cls):
+        return cls.__name__
 
 class NgrokConfig:
     def __init__(self):
@@ -117,12 +199,23 @@ class ProxyConnection:
             await self._connect_proxy_server()
             
             # 发送RegProxy注册
-            await self._send_regproxy()
+            try:
+                regproxy_msg = RegProxy(ClientId=self.client.client_id)
+                await self.client._send_packet(self.proxy_writer, regproxy_msg)
+            except Exception as e:
+                logger.debug(f"发送数据时发生错误: {str(e)}")
+                return
 
             # 等待StartProxy消息
-            self.url = await self._message_loop_until_startproxy()
-            if not self.url:
-                logger.debug("未收到有效URL")
+            try:
+                msg = await self.client._recv_packet(self.proxy_reader)
+                if isinstance(msg, StartProxy):
+                    if not msg.Url:
+                        logger.debug("未收到有效URL")
+                        return
+                    self.url = msg.Url
+            except Exception as e:
+                logger.debug(f"接收数据时发生错误: {str(e)}")
                 return
 
             protocol = self.url.split(":")[0]
@@ -156,35 +249,6 @@ class ProxyConnection:
         except Exception as e:
             logger.error(f"代理服务器连接失败: {str(e)}")
             raise
-
-    async def _send_regproxy(self):
-        """发送代理注册信息"""
-        regproxy_msg = {
-            'Type': 'RegProxy',
-            'Payload': {
-                'ClientId': self.client.client_id
-            }
-        }
-        await self._send_packet(regproxy_msg)
-
-    async def _message_loop_until_startproxy(self):
-        """持续接收消息，直到收到StartProxy"""
-        while True:
-            try:
-                header = await self.proxy_reader.read(8)
-                if not header:
-                    break
-                msg_len, _ = struct.unpack('<II', header)
-                msg = json.loads(await self.proxy_reader.read(msg_len))
-                logger.debug(f"收到消息: {msg}")
-                if msg.get('Type') == 'StartProxy':
-                    return msg['Payload']['Url']
-            except (ConnectionResetError, BrokenPipeError):
-                break
-            except json.JSONDecodeError:
-                logger.error("消息解析失败")
-
-        return ''
 
     async def _connect_local_service_udp(self):
         class LocalProtocol(asyncio.DatagramProtocol):
@@ -270,7 +334,7 @@ class ProxyConnection:
                     logger.error(f"{label} 转发错误: {str(e)}")
 
         tcp_task = asyncio.create_task(tcp_to_udp(self.proxy_reader, "服务端 TCP -> 本地 UDP"))
-        udp_task = asyncio.create_task(udp_to_tcp(self.local_queue, "本地 UDP -> 服务端 TCP"))
+        udp_task = asyncio.create_task(udp_to_tcp(self.local_queue, "服务端 TCP <- 本地 UDP"))
         self.tasks.extend([tcp_task, udp_task])
 
         done, pending = await asyncio.wait({udp_task, tcp_task}, return_when=asyncio.FIRST_COMPLETED)
@@ -301,7 +365,7 @@ class ProxyConnection:
             forward(self.proxy_reader, self.local_writer, "服务端 TCP -> 本地 TCP")
         )
         task2 = asyncio.create_task(
-            forward(self.local_reader, self.proxy_writer, "本地 TCP -> 服务端 TCP")
+            forward(self.local_reader, self.proxy_writer, "服务端 TCP <- 本地 TCP")
         )
         self.tasks.extend([task1, task2])
 
@@ -310,18 +374,6 @@ class ProxyConnection:
         for task in pending:
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
-
-    async def _send_packet(self, data: dict):
-        """发送协议数据包"""
-        try:
-            msg = json.dumps(data).encode('utf-8')
-            header = struct.pack('<LL', len(msg), 0)
-            self.proxy_writer.write(header + msg)
-            await self.proxy_writer.drain()
-            logger.debug(f"发送数据包: {data}")
-        except Exception as e:
-            logger.error(f"发送数据包失败: {str(e)}")
-            raise
 
     async def _cleanup(self):
         """资源清理"""
@@ -401,88 +453,104 @@ class NgrokClient:
                 server_hostname=self.config.server_host
             )
             logger.info(f"成功连接到服务器 {self.config.server_host}:{self.config.server_port}")
+        except ConnectionRefusedError:
+            logger.error(f"服务器拒绝连接: {self.config.server_host}:{self.config.server_port}")
+            raise
         except Exception as e:
             logger.error(f"服务器连接失败: {str(e)}")
             raise
 
     async def _handle_auth(self):
         """处理认证流程"""
-        auth_msg = {
-            'Type': 'Auth',
-            'Payload': {
-                'Version': '2',
-                'MmVersion': '1.7',
-                'User': self.config.authtoken,
-                'Password': '',
-                'OS': 'darwin',
-                'Arch': 'amd64',
-                'ClientId': self.client_id
-            }
-        }
-        await self._send_packet(auth_msg)
+        auth_msg = Auth(ClientId=self.client_id, User=self.config.authtoken)
+        await self._send_packet(self.main_writer, auth_msg)
 
-    async def _send_packet(self, data: dict):
+    def dict_to_message(self, msg: dict):
+        """
+        Converts a dictionary to a message type.
+        """
+        msg_type = msg.get("Type")
+        payload = msg.get("Payload", {})
+        msg_classes = {
+            "Auth": Auth,
+            "AuthResp": AuthResp,
+            "ReqTunnel": ReqTunnel,
+            "NewTunnel": NewTunnel,
+            "ReqProxy": ReqProxy,
+            "RegProxy": RegProxy,
+            "StartProxy": StartProxy,
+            "Ping": Ping,
+            "Pong": Pong
+        }
+        if msg_type in msg_classes:
+            cls = msg_classes[msg_type]
+            payload = {k: payload[k] for k in payload if k in {f.name for f in fields(cls)}}
+            return cls(**payload)
+        else:
+            raise ValueError(f"Unknown message type: {msg_type}")
+
+    async def _recv_packet(self, reader: asyncio.StreamReader):
+        """接收协议数据包"""
+        header = await reader.read(8)
+        if not header:
+            logger.warning("Received empty header, connection might be closed.")
+            return
+        msg_len, _ = struct.unpack('<II', header)
+        data = await reader.read(msg_len)
+        msg = json.loads(data.decode('utf-8'))
+        logger.debug(f"收到消息: {msg}")
+        return self.dict_to_message(msg)
+
+    async def _send_packet(self, writer: asyncio.StreamWriter, msg):
         """发送协议数据包"""
-        try:
-            msg = json.dumps(data).encode('utf-8')
-            header = struct.pack('<LL', len(msg), 0)
-            self.main_writer.write(header + msg)
-            await self.main_writer.drain()
-            logger.debug(f"发送数据包: {data}")
-        except Exception as e:
-            logger.error(f"发送数据包失败: {str(e)}")
-            raise
+        data = {"Type": msg.get_class_name(), "Payload": asdict(msg)}
+        msg = json.dumps(data).encode('utf-8')
+        header = struct.pack('<LL', len(msg), 0)
+        writer.write(header + msg)
+        await writer.drain()
+        logger.debug(f"发送数据包: {data}")
 
     async def _handle_req_tunnel(self):
         """请求建立隧道"""
         for tunnel in self.config.tunnels:
-            req_id = secrets.token_hex(8)
-            self.req_map[req_id] = (tunnel['lhost'], tunnel['lport'])
+            request_id = secrets.token_hex(8)
+            self.req_map[request_id] = (tunnel['lhost'], tunnel['lport'])
             
-            req_msg = {
-                'Type': 'ReqTunnel',
-                'Payload': {
-                    'ReqId': req_id,
-                    'Protocol': tunnel['protocol'],
-                    'Hostname': tunnel['hostname'],
-                    'Subdomain': tunnel['subdomain'],
-                    'HttpAuth': tunnel['httpauth'],
-                    'RemotePort': tunnel['rport']
-                }
-            }
-            await self._send_packet(req_msg)
+            req_msg = ReqTunnel(
+                ReqId=request_id,
+                Protocol=tunnel['protocol'],
+                Hostname=tunnel['hostname'],
+                Subdomain=tunnel['subdomain'],
+                HttpAuth=tunnel['httpauth'],
+                RemotePort=tunnel['rport']
+            )
+            await self._send_packet(self.main_writer, req_msg)
 
-    async def _process_message(self, msg: dict):
+    async def _process_message(self, msg):
         """处理服务器消息"""
-        msg_type = msg.get('Type', '')
-        payload = msg.get('Payload', {})
-
-        if msg_type == 'AuthResp':
-            if payload.get('Error'):
-                logger.error(f"认证失败: {payload['Error']}")
+        if isinstance(msg, AuthResp):
+            if msg.Error:
+                logger.error(f"认证失败: {msg.Error}")
                 self.running = False
-            else:
-                self.client_id = payload['ClientId']
-                logger.info(f"认证成功，客户端ID: {self.client_id}")
-                await self._handle_req_tunnel()
-                self.last_ping = time.time()
-
-        elif msg_type == 'NewTunnel':
-            if payload.get('Error'):
-                logger.error(f"隧道建立失败: {payload['Error']}")
-            else:
-                url = payload['Url']
-                self.tunnel_map[url] = self.req_map.get(payload['ReqId'], ('', 0))
-                logger.info(f"隧道已建立: {url}")
-
-        elif msg_type == 'ReqProxy':
+                return
+            self.client_id = msg.ClientId
+            logger.info(f"认证成功，客户端ID: {self.client_id}")
+            await self._handle_req_tunnel()
+            self.last_ping = time.time()
+        elif isinstance(msg, NewTunnel):
+            if msg.Error:
+                logger.error(f"隧道建立失败: {msg.Error}")
+                return
+            url = msg.Url
+            self.tunnel_map[url] = self.req_map.get(msg.ReqId, ('', 0))
+            logger.info(f"隧道已建立: {url}")
+        elif isinstance(msg, ReqProxy):
             async with self.lock:
                 logger.info(f"收到代理请求，启动新连接...")
                 proxy_conn = ProxyConnection(self)
                 self.proxy_connections.append(proxy_conn)
                 asyncio.create_task(proxy_conn.start())
-
-        elif msg_type == 'Pong':
+        elif isinstance(msg, Pong):
             self.last_ping = time.time()
             logger.debug("收到心跳响应")
 
@@ -490,21 +558,14 @@ class NgrokClient:
         """接收数据主循环"""
         try:
             while self.running:
-                header = await self.main_reader.read(8)
-                if not header:
+                msg = await self._recv_packet(self.main_reader)
+                if not msg:
                     break
-                try:
-                    msg_len, _ = struct.unpack('<II', header)
-                    msg = json.loads(await self.main_reader.read(msg_len))
-                    logger.debug(f"收到消息: {msg}")
-                    await self._process_message(msg)
-                except json.JSONDecodeError:
-                    logger.error("消息解析失败")
-
+                await self._process_message(msg)
         except (asyncio.IncompleteReadError, ConnectionError) as e:
-            logger.error(f"连接中断: {str(e)}")
+            logger.debug(f"连接中断: {str(e)}")
         except Exception as e:
-            logger.error(f"接收数据时发生错误: {str(e)}")
+            logger.debug(f"接收数据时发生错误: {str(e)}")
         finally:
             self.running = False
 
@@ -548,10 +609,10 @@ class NgrokClient:
         while self.running:
             if self.last_ping and time.time() - self.last_ping > 20:
                 try:
-                    await self._send_packet({'Type': 'Ping', 'Payload': {}})
+                    await self._send_packet(self.main_writer, Ping())
                     self.last_ping = time.time()
                 except Exception as e:
-                    logger.error(f"发送心跳失败: {str(e)}")
+                    logger.debug(f"发送心跳失败: {str(e)}")
                     self.running = False
             await asyncio.sleep(1)
 
@@ -563,6 +624,11 @@ class NgrokClient:
             self._heartbeat_task()
         )
         try:
+            try:
+                await self._handle_auth()
+            except Exception as e:
+               logger.debug(f"发送数据时发生错误: {str(e)}")
+               raise
             # 启动接收和心跳任务
             await self.main_loop_task
         except asyncio.CancelledError:
@@ -574,7 +640,6 @@ class NgrokClient:
         while True:
             try:
                 await self._connect_server()
-                await self._handle_auth()
                 self.current_retry_interval = 1
                 return
             except Exception as e:

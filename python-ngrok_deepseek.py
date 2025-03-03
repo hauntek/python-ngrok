@@ -462,7 +462,7 @@ class NgrokClient:
                 logger.error(f"认证失败: {payload['Error']}")
                 self.running = False
             else:
-                self.client_id = payload.get('ClientId', '')
+                self.client_id = payload['ClientId']
                 logger.info(f"认证成功，客户端ID: {self.client_id}")
                 await self._handle_req_tunnel()
                 self.last_ping = time.time()
